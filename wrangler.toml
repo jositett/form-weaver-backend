@@ -1,0 +1,51 @@
+name = "formweaver-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+node_compat = true
+
+[observability]
+enabled = true
+
+# Environment variables (public)
+[vars]
+ENVIRONMENT = "development"
+JWT_EXPIRES_IN = "1h"
+REFRESH_TOKEN_EXPIRES_IN = "30d"
+
+# Secrets (set with: wrangler secret put SECRET_NAME)
+# JWT_SECRET
+# STRIPE_SECRET_KEY
+# STRIPE_WEBHOOK_SECRET
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "formweaver-dev"
+database_id = "local"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "FORM_CACHE"
+id = "local-form-cache"
+
+[[kv_namespaces]]
+binding = "SESSION_STORE"
+id = "local-session-store"
+
+[[kv_namespaces]]
+binding = "EMAIL_TOKENS"
+id = "local-email-tokens"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "local-rate-limit"
+
+# R2 Buckets (optional, for file uploads)
+# [[r2_buckets]]
+# binding = "FILE_UPLOADS"
+# bucket_name = "formweaver-uploads-dev"
+
+# Development settings
+[dev]
+port = 8787
+local_protocol = "http"
