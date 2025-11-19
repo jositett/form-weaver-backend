@@ -3,10 +3,9 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 
-// Import routes (to be created)
-// import auth from './routes/auth';
-// import forms from './routes/forms';
-// import submissions from './routes/submissions';
+import auth from './routes/auth';
+import forms from './routes/forms';
+import submissions from './routes/submissions';
 
 // Environment bindings type
 export type Env = {
@@ -51,10 +50,10 @@ app.get('/api/health', (c) => {
   });
 });
 
-// Mount routes (uncomment when created)
-// app.route('/api/auth', auth);
-// app.route('/api/forms', forms);
-// app.route('/api/submissions', submissions);
+// Mount routes
+app.route('/api/auth', auth);
+app.route('/api/forms', forms);
+app.route('/api/submissions', submissions); // Submission management endpoints
 
 // 404 handler
 app.notFound((c) => {

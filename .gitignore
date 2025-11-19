@@ -1,23 +1,37 @@
-@'
 # Dependencies
 node_modules/
 .pnp
 .pnp.js
+.pnp.cjs
+.yarn/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
 
 # Cloudflare Workers
 .wrangler/
+wrangler.toml.backup
+.wrangler/state/
+.wrangler/local/
 worker/
 dist/
 
 # Environment Variables
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
 .dev.vars
 *.vars
+*.env
 
 # Build outputs
 build/
 out/
+.wrangler/
 
 # Logs
 logs/
@@ -25,6 +39,9 @@ logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
 # Runtime data
 pids/
@@ -32,8 +49,11 @@ pids/
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Testing
 coverage/
+.nyc_output/
+test-results/
+*.lcov
 
 # OS generated files
 .DS_Store
@@ -43,6 +63,7 @@ coverage/
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
 # Editor directories and files
 .vscode/
@@ -50,6 +71,11 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
 # TypeScript cache
 *.tsbuildinfo
@@ -66,7 +92,23 @@ temp/
 *.tmp
 *.temp
 
-# Wrangler generated files
-.wrangler/state/
-.wrangler/local/
-'@ | Out-File -FilePath .gitignore -Encoding UTF8 -NoNewline
+# Database files (local development)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Lock files (keep package-lock.json if using npm)
+# Uncomment if using yarn/pnpm/bun exclusively
+# package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Misc
+.cache/
+.temp/
+
+# Backup files
+*.bak
+*.backup
