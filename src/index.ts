@@ -6,10 +6,12 @@ import { prettyJSON } from 'hono/pretty-json';
 import auth from './routes/auth';
 import forms from './routes/forms';
 import submissions from './routes/submissions';
+import files from './routes/files';
 
 // Environment bindings type
 export type Env = {
   DB: D1Database;
+  FILE_UPLOADS: R2Bucket;
   FORM_CACHE: KVNamespace;
   SESSION_STORE: KVNamespace;
   EMAIL_TOKENS: KVNamespace;
@@ -54,6 +56,7 @@ app.get('/api/health', (c) => {
 app.route('/api/auth', auth);
 app.route('/api/forms', forms);
 app.route('/api/submissions', submissions); // Submission management endpoints
+app.route('/api/files', files); // File upload endpoints
 
 // 404 handler
 app.notFound((c) => {

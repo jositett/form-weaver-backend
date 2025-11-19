@@ -1,5 +1,6 @@
--- FormWeaver Database Schema
--- SQLite (D1) compatible
+-- Migration: Complete FormWeaver Database Schema
+-- Description: Complete database schema for FormWeaver including file upload support
+-- Timestamp: 2025-01-19
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

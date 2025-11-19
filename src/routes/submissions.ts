@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
+import { checkRateLimit, getClientIP, createRateLimitHeaders } from '../utils/rateLimit';
 import type { HonoContext } from '../types/index';
 
 // Environment bindings type
@@ -93,7 +94,21 @@ submissions.post(
         }, 403);
       }
 
-      // 2. Validate submission data against form schema
+      // 2. Check rate limit (10 submissions per 10 minutes per IP)
+      const clientIP = getClientIP(c.req.raw);
+      const rateLimitKey = `${clientIP}:form:${formId}`;
+
+      const rateLimitResult = await checkRateLimit(c.env.RATE_LIMIT, rateLimitKey);
+
+      if (!rateLimitResult.allowed) {
+        const headers = createRateLimitHeaders(rateLimitResult);
+        return c.json({
+          success: false,
+          error: 'Rate limit exceeded. Please try again later.',
+        }, 429, headers);
+      }
+
+      // 3. Validate submission data against form schema
       const formSchema = JSON.parse(form.schema as string);
       // TODO: Implement dynamic Zod schema validation based on formSchema
       // For now, we'll just check if it's an object.
@@ -335,6 +350,73 @@ submissions.get(
       return c.json({
         success: false,
         error: 'Failed to get submission',
+      }, 500);
+    }
+  }
+);
+
+/**
+ * DELETE /api/forms/:formId/submissions/:submissionId - Delete submission
+ */
+submissions.delete(
+  '/forms/:formId/submissions/:submissionId',
+  authMiddleware,
+  async (c) => {
+    const formId = c.req.param('formId');
+    const submissionId = c.req.param('submissionId');
+    const workspaceId = c.get('workspaceId')!;
+
+    try {
+      // Check workspace membership
+      const membershipCheck = await checkWorkspaceMembership(c, workspaceId);
+      if (membershipCheck instanceof Response) return membershipCheck;
+
+      // Verify form exists and belongs to workspace
+      const form = await c.env.DB.prepare(
+        'SELECT id, workspace_id FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
+      )
+        .bind(formId, workspaceId)
+        .first();
+
+      if (!form) {
+        return c.json({
+          success: false,
+          error: 'Form not found or access denied',
+        }, 404);
+      }
+
+      // Check if submission exists
+      const submission = await c.env.DB.prepare(
+        'SELECT id, data FROM submissions WHERE id = ? AND form_id = ?'
+      )
+        .bind(submissionId, formId)
+        .first();
+
+      if (!submission) {
+        return c.json({
+          success: false,
+          error: 'Submission not found',
+        }, 404);
+      }
+
+      // Delete submission (soft delete or hard delete based on role)
+      // Currently doing hard delete. Could change to soft delete if needed.
+      await c.env.DB.prepare(
+        'DELETE FROM submissions WHERE id = ? AND form_id = ?'
+      )
+        .bind(submissionId, formId)
+        .run();
+
+      return c.json({
+        success: true,
+        message: 'Submission deleted successfully',
+      });
+
+    } catch (error) {
+      console.error('[Delete Submission Error]', error);
+      return c.json({
+        success: false,
+        error: 'Failed to delete submission',
       }, 500);
     }
   }

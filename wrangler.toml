@@ -1,7 +1,6 @@
 name = "formweaver-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
-nodejs_compat = true
 
 [observability]
 enabled = true
@@ -40,10 +39,10 @@ id = "local-email-tokens"
 binding = "RATE_LIMIT"
 id = "local-rate-limit"
 
-# R2 Buckets (optional, for file uploads)
-# [[r2_buckets]]
-# binding = "FILE_UPLOADS"
-# bucket_name = "formweaver-uploads-dev"
+# R2 Buckets (for file uploads)
+[[r2_buckets]]
+binding = "FILE_UPLOADS"
+bucket_name = "formweaver-uploads-dev"
 
 # Development settings
 [dev]
