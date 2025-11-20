@@ -12,6 +12,118 @@ interface AnalyticsResponse {
   averageTime: number; // seconds
   views: { date: string; count: number }[];
   submissionRate: { date: string; count: number }[];
+  fieldAnalytics?: FieldAnalytics;
+}
+
+interface FieldAnalytics {
+  mostSkippedFields: FieldSkipData[];
+  mostErrorFields: FieldErrorData[];
+}
+
+interface FieldSkipData {
+  fieldId: string;
+  fieldLabel?: string;
+  skipCount: number;
+  skipRate: number; // 0.0 to 1.0
+}
+
+interface FieldErrorData {
+  fieldId: string;
+  fieldLabel?: string;
+  errorCount: number;
+  errorRate: number; // 0.0 to 1.0
+}
+
+/**
+ * Calculate field-level analytics for a form
+ * Analyzes skip rates and error rates across all submissions
+ */
+async function calculateFieldAnalytics(
+  db: any,
+  formId: string,
+  formSchema: any[],
+  totalSubmissions: number
+): Promise<FieldAnalytics> {
+  // Get all submissions for analysis
+  const submissionsQuery = db.prepare(
+    'SELECT data FROM submissions WHERE form_id = ?'
+  ).bind(formId);
+
+  const submissions = await submissionsQuery.all();
+  const submissionData = submissions.results as { data: string }[];
+
+  if (submissionData.length === 0) {
+    return { mostSkippedFields: [], mostErrorFields: [] };
+  }
+
+  // Initialize field tracking
+  const fieldStats: Record<string, {
+    skips: number;
+    errors: number; // Placeholder for future error tracking
+    field: any;
+  }> = {};
+
+  // Initialize stats for each field in form schema
+  formSchema.forEach(field => {
+    if (field.id) {
+      fieldStats[field.id] = {
+        skips: 0,
+        errors: 0,
+        field,
+      };
+    }
+  });
+
+  // Analyze each submission
+  submissionData.forEach(submission => {
+    try {
+      const data = JSON.parse(submission.data);
+
+      // Check each field for skips
+      Object.keys(fieldStats).forEach(fieldId => {
+        const fieldValue = data[fieldId];
+
+        // Consider field "skipped" if null, undefined, empty string, or empty array
+        if (fieldValue === null ||
+            fieldValue === undefined ||
+            fieldValue === '' ||
+            (Array.isArray(fieldValue) && fieldValue.length === 0)) {
+          fieldStats[fieldId].skips++;
+        }
+      });
+    } catch (error) {
+      console.error('[Submission Parse Error]', error);
+    }
+  });
+
+  // Convert to arrays and calculate rates
+  const mostSkippedFields: FieldSkipData[] = Object.entries(fieldStats)
+    .map(([fieldId, stats]) => ({
+      fieldId,
+      fieldLabel: stats.field.label,
+      skipCount: stats.skips,
+      skipRate: totalSubmissions > 0 ? stats.skips / totalSubmissions : 0,
+    }))
+    .sort((a, b) => b.skipRate - a.skipRate) // Sort by highest skip rate first
+    .slice(0, 10); // Top 10 most skipped fields
+
+  // For now, mostErrorFields is empty since we don't track validation errors
+  // In the future, this could track actual validation failures
+  const mostErrorFields: FieldErrorData[] = Object.entries(fieldStats)
+    .map(([fieldId, stats]) => ({
+      fieldId,
+      fieldLabel: stats.field.label,
+      errorCount: stats.errors,
+      errorRate: totalSubmissions > 0 ? stats.errors / totalSubmissions : 0,
+    }))
+    .filter(field => field.errorCount > 0) // Only include fields with errors
+    .sort((a, b) => b.errorRate - a.errorRate) // Sort by highest error rate first
+    .slice(0, 10); // Top 10 problematic fields
+
+  return {
+    mostSkippedFields,
+    mostErrorFields,
+  };
 }
 
 // --- Zod Schemas ---
@@ -68,16 +180,37 @@ analyticsRouter.get(
         ORDER BY date ASC
       `).bind(formId);
 
+      // 3. Get form schema to analyze fields
+      const formQuery = db.prepare(
+        'SELECT schema FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
+      ).bind(formId, workspaceId);
+
       const [
         totalSubmissionsResult,
         submissionRateResult,
+        formResult,
       ] = await db.batch([
         totalSubmissionsQuery,
         submissionRateQuery,
+        formQuery,
       ]);
 
       const totalSubmissions = (totalSubmissionsResult.results[0] as { totalSubmissions: number })?.totalSubmissions ?? 0;
       const submissionRate = submissionRateResult.results as { date: string; count: number }[];
+      const form = formResult.results[0] as { schema: string } | undefined;
+
+      // 4. Field-level analytics (only if we have submissions and form schema)
+      let fieldAnalytics: FieldAnalytics | undefined;
+
+      if (totalSubmissions > 0 && form?.schema) {
+        try {
+          const formSchema = JSON.parse(form.schema) as any[];
+          fieldAnalytics = await calculateFieldAnalytics(db, formId, formSchema, totalSubmissions);
+        } catch (error) {
+          console.error('[Field Analytics Error]', error);
+          // Continue without field analytics if there's an error
+        }
+      }
 
       const analyticsData: AnalyticsResponse = {
         totalSubmissions,
@@ -88,6 +221,7 @@ analyticsRouter.get(
         // Placeholder: View tracking is a separate task
         views: [],
         submissionRate,
+        fieldAnalytics,
       };
 
       return c.json<AnalyticsResponse>({
