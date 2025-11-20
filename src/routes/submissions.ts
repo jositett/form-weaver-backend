@@ -141,6 +141,37 @@ submissions.post(
         )
         .run();
 
+      // 4. Trigger webhooks (if configured)
+      try {
+        await triggerWebhooks(c.env, formId, {
+          id: submissionId,
+          formId,
+          workspaceId: form.workspace_id as string,
+          data: submissionData,
+          submittedAt: now,
+          ipAddress,
+          userAgent,
+          referrer,
+        });
+      } catch (error) {
+        console.error('[Webhook Error]', error);
+        // Don't fail the submission due to webhook errors
+      }
+
+      // 5. Send email notifications (if configured)
+      try {
+        await sendNotificationEmails(c.env, formId, {
+          id: submissionId,
+          formId,
+          workspaceId: form.workspace_id as string,
+          data: submissionData,
+          submittedAt: now,
+        });
+      } catch (error) {
+        console.error('[Email Notification Error]', error);
+        // Don't fail the submission due to email errors
+      }
+
       return c.json({
         success: true,
         data: {
@@ -421,5 +452,72 @@ submissions.delete(
     }
   }
 );
+
+/**
+ * Webhook payload type
+ */
+interface WebhookPayload {
+  id: string;
+  formId: string;
+  workspaceId: string;
+  data: Record<string, any>;
+  submittedAt: number;
+  ipAddress: string;
+  userAgent: string;
+  referrer: string | null;
+}
+
+/**
+ * Trigger webhooks for a form submission
+ * TODO: Implement when webhooks table and delivery system are ready
+ */
+async function triggerWebhooks(
+  env: Env,
+  formId: string,
+  payload: WebhookPayload
+): Promise<void> {
+  console.log(`[Webhook] Would trigger webhooks for form ${formId}`, {
+    submissionId: payload.id,
+    timestamp: new Date(payload.submittedAt).toISOString(),
+  });
+
+  // TODO: Query webhooks table for configured webhooks
+  // TODO: Send POST requests to webhook URLs with signature
+  // TODO: Implement retry logic and delivery tracking
+  // TODO: For now, this is a no-op placeholder
+}
+
+/**
+ * Email notification payload type
+ */
+interface NotificationPayload {
+  id: string;
+  formId: string;
+  workspaceId: string;
+  data: Record<string, any>;
+  submittedAt: number;
+}
+
+/**
+ * Send email notifications for a form submission
+ * TODO: Implement when email service and notifications table are ready
+ */
+async function sendNotificationEmails(
+  env: Env,
+  formId: string,
+  payload: NotificationPayload
+): Promise<void> {
+  console.log(`[Email Notification] Would send notifications for form ${formId}`, {
+    submissionId: payload.id,
+    data: payload.data,
+    timestamp: new Date(payload.submittedAt).toISOString(),
+  });
+
+  // TODO: Query form_notifications table for configured notifications
+  // TODO: Integrate with email service (Resend, SendGrid, etc.)
+  // TODO: Send email templates based on notification preferences
+  // TODO: Handle email delivery errors
+  // TODO: For now, this is a no-op placeholder
+}
 
 export default submissions;
