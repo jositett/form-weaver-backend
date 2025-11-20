@@ -62,8 +62,8 @@ export const formFieldSchema = z.object({
   ]),
   label: z.string().min(1, 'Field label is required').max(100, 'Label must be less than 100 characters'),
   required: z.boolean().optional(),
-  validation: z.record(z.any()).optional(),
-  properties: z.record(z.any()).optional(),
+  validation: z.record(z.string(), z.any()).optional(),
+  properties: z.record(z.string(), z.any()).optional(),
 });
 
 // Update form schema (partial - only modified fields)
@@ -78,7 +78,7 @@ export const updateFormSchema = z.object({
 );
 
 export const updateFormStatusSchema = z.object({
-  status: z.enum(['draft', 'published', 'archived'], { required_error: 'Status is required' }),
+  status: z.enum(['draft', 'published', 'archived']),
 });
 
 export const createFormSchema = z.object({
@@ -96,6 +96,28 @@ export const listFormsQuerySchema = z.object({
   sortBy: z.enum(['created_at', 'updated_at', 'title']).optional().default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
+
+export const uuidSchema = z.string().uuid('Invalid UUID format');
+
+export const formIdParamSchema = z.object({
+  id: uuidSchema,
+});
+
+export type FormIdParam = z.infer<typeof formIdParamSchema>;
+
+export const formVersionIdParamSchema = z.object({
+  id: uuidSchema, // formId
+  versionId: uuidSchema, // form_versions.id
+});
+
+export type FormVersionIdParam = z.infer<typeof formVersionIdParamSchema>;
+
+export const listFormVersionsQuerySchema = z.object({
+  limit: z.string().transform(val => Math.min(parseInt(val || '50'), 100)).optional().default(50),
+  cursor: z.string().uuid('Invalid UUID format for cursor').optional(),
+});
+
+export type ListFormVersionsQuery = z.infer<typeof listFormVersionsQuerySchema>;
 
 // Type exports
 export type SignupInput = z.infer<typeof signupSchema>;

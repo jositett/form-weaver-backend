@@ -12,22 +12,12 @@ import {
   UpdateFormStatusInput,
   ListFormsQuery
 } from '../utils/validation';
-import type { HonoContext } from '../types/index';
+import type { Env, HonoContext } from '../types/index';
+import { getDb } from '../db/db';
 
 // Generate random ID (simple implementation)
 const generateId = (): string => {
   return crypto.randomUUID();
-};
-
-// Environment bindings type
-type Env = {
-  DB: D1Database;
-  FORM_CACHE: KVNamespace;
-  SESSION_STORE: KVNamespace;
-  EMAIL_TOKENS: KVNamespace;
-  RATE_LIMIT: KVNamespace;
-  JWT_SECRET: string;
-  ENVIRONMENT: string;
 };
 
 // Create forms router
@@ -86,7 +76,7 @@ forms.post(
       const formId = generateId();
 
       // Insert form into database
-      await c.env.DB.prepare(`
+      await getDb(c.env).prepare(`
         INSERT INTO forms (id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
@@ -197,7 +187,7 @@ forms.get(
       const limit = query.limit || 50;
       const whereClause = conditions.join(' AND ');
 
-      const forms = await c.env.DB.prepare(`
+      const forms = await getDb(c.env).prepare(`
         SELECT id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at
         FROM forms
         WHERE ${whereClause} AND deleted_at IS NULL
@@ -291,7 +281,7 @@ forms.get(
       }
 
       // Fetch from database
-      const form = await c.env.DB.prepare(`
+      const form = await getDb(c.env).prepare(`
         SELECT id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at
         FROM forms
         WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
@@ -370,7 +360,7 @@ forms.get(
       if (membershipCheck instanceof Response) return membershipCheck;
 
       // Verify form exists and belongs to workspace
-      const form = await c.env.DB.prepare(
+      const form = await getDb(c.env).prepare(
         'SELECT id, workspace_id FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
@@ -419,7 +409,7 @@ forms.get(
       const limit = query.limit || 50;
       const whereClause = conditions.join(' AND ');
 
-      const submissions = await c.env.DB.prepare(`
+      const submissions = await getDb(c.env).prepare(`
         SELECT s.id, s.form_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at
         FROM submissions s
         WHERE ${whereClause}
@@ -458,7 +448,7 @@ forms.get(
       }
 
       // Count total submissions for this form
-      const totalCount = await c.env.DB.prepare(
+      const totalCount = await getDb(c.env).prepare(
         'SELECT COUNT(*) as count FROM submissions WHERE form_id = ?'
       )
         .bind(formId)
@@ -504,7 +494,7 @@ forms.get(
       if (membershipCheck instanceof Response) return membershipCheck;
 
       // Get submission with form validation
-      const submission = await c.env.DB.prepare(`
+      const submission = await getDb(c.env).prepare(`
         SELECT s.id, s.form_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at,
                f.workspace_id, f.title as form_title
         FROM submissions s
@@ -565,7 +555,7 @@ forms.put(
       const { role } = membershipCheck;
 
       // Get current form data
-      const currentForm = await c.env.DB.prepare(
+      const currentForm = await getDb(c.env).prepare(
         'SELECT title, description, schema, status, version FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
@@ -619,7 +609,7 @@ forms.put(
       const updateQuery = `UPDATE forms SET ${updateFields.join(', ')} WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`;
       updateParams.push(formId, workspaceId);
 
-      const result = await c.env.DB.prepare(updateQuery)
+      const result = await getDb(c.env).prepare(updateQuery)
         .bind(...updateParams)
         .run();
 
@@ -676,7 +666,7 @@ forms.delete(
       }
 
       // Verify form exists and belongs to workspace
-      const form = await c.env.DB.prepare(
+      const form = await getDb(c.env).prepare(
         'SELECT status FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
@@ -698,7 +688,7 @@ forms.delete(
       }
 
       // Soft delete the form
-      const result = await c.env.DB.prepare(
+      const result = await getDb(c.env).prepare(
         'UPDATE forms SET deleted_at = ?, status = ? WHERE id = ? AND workspace_id = ?'
       )
         .bind(Date.now(), 'archived', formId, workspaceId)
@@ -747,7 +737,7 @@ forms.post(
       const { userId } = membershipCheck;
 
       // Get original form
-      const originalForm = await c.env.DB.prepare(`
+      const originalForm = await getDb(c.env).prepare(`
         SELECT title, description, schema, status
         FROM forms
         WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
@@ -767,7 +757,7 @@ forms.post(
       const duplicateId = generateId();
       const duplicateTitle = `${originalForm.title} (Copy)`;
 
-      await c.env.DB.prepare(`
+      await getDb(c.env).prepare(`
         INSERT INTO forms (id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
@@ -840,7 +830,7 @@ forms.patch(
       }
 
       // Verify form exists
-      const form = await c.env.DB.prepare(
+      const form = await getDb(c.env).prepare(
         'SELECT status FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
@@ -863,7 +853,7 @@ forms.patch(
 
       // Update status and version
       const now = Date.now();
-      await c.env.DB.prepare(
+      await getDb(c.env).prepare(
         'UPDATE forms SET status = ?, version = version + 1, updated_at = ? WHERE id = ? AND workspace_id = ?'
       )
         .bind(updateData.status, now, formId, workspaceId)

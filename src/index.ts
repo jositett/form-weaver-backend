@@ -7,18 +7,9 @@ import auth from './routes/auth';
 import forms from './routes/forms';
 import submissions from './routes/submissions';
 import files from './routes/files';
+import formVersionsRouter from './routes/formVersions';
 
-// Environment bindings type
-export type Env = {
-  DB: D1Database;
-  FILE_UPLOADS: R2Bucket;
-  FORM_CACHE: KVNamespace;
-  SESSION_STORE: KVNamespace;
-  EMAIL_TOKENS: KVNamespace;
-  RATE_LIMIT: KVNamespace;
-  JWT_SECRET: string;
-  ENVIRONMENT: string;
-};
+import type { Env } from './types';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -57,6 +48,7 @@ app.route('/api/auth', auth);
 app.route('/api/forms', forms);
 app.route('/api/submissions', submissions); // Submission management endpoints
 app.route('/api/files', files); // File upload endpoints
+app.route('/api/v1', formVersionsRouter); // Form versioning endpoints
 
 // 404 handler
 app.notFound((c) => {

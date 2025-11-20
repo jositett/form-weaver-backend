@@ -82,10 +82,29 @@ export interface Form {
   createdAt: number;
   updatedAt: number;
 }
+export interface FormVersion {
+  id: string;
+  form_id: string;
+  version_number: number;
+  form_schema: string; // JSON string
+  created_at: string; // ISO 8601 timestamp
+  is_active: number; // 0 or 1
+  version_notes: string | null; // Added for versioning feature
+export interface FormVersionListItem {
+  id: string;
+  form_id: string;
+  version_number: number;
+  created_at: string; // ISO 8601 timestamp
+  version_notes: string | null;
+}
 
 // Hono context bindings
+
+export interface HonoContext {
 export interface HonoContext {
   userId?: string;
   workspaceId?: string;
   userRole?: string;
 }
+
+export { Env } from './Env';

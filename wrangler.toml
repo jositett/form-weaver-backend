@@ -21,6 +21,7 @@ REFRESH_TOKEN_EXPIRES_IN = "30d"
 binding = "DB"
 database_name = "formweaver-dev"
 database_id = "local"
+migrations_dir = "src/db/migrations"
 
 # KV Namespaces
 [[kv_namespaces]]

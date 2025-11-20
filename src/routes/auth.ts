@@ -15,22 +15,12 @@ import {
   ResetPasswordInput,
   ResetPasswordConfirmInput
 } from '../utils/validation';
-import type { HonoContext } from '../types/index';
+import type { Env, HonoContext } from '../types/index';
+import { getDb } from '../db/db';
 
 // Generate random ID (simple implementation)
 const generateId = (): string => {
   return crypto.randomUUID();
-};
-
-// Environment bindings type
-type Env = {
-  DB: D1Database;
-  FORM_CACHE: KVNamespace;
-  SESSION_STORE: KVNamespace;
-  EMAIL_TOKENS: KVNamespace;
-  RATE_LIMIT: KVNamespace;
-  JWT_SECRET: string;
-  ENVIRONMENT: string;
 };
 
 // Create auth router
@@ -51,7 +41,7 @@ auth.post(
 
     try {
       // Check if user already exists
-      const existingUser = await c.env.DB.prepare(
+      const existingUser = await getDb(c.env).prepare(
         'SELECT id FROM users WHERE email = ?'
       )
         .bind(email.toLowerCase())
@@ -75,14 +65,14 @@ auth.post(
       // Start transaction by using batch operations
       const batch = [
         // Create user
-        c.env.DB.prepare(`
+        getDb(c.env).prepare(`
           INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
           VALUES (?, ?, ?, ?, 0, ?, ?)
         `)
           .bind(userId, email.toLowerCase(), passwordHash, name, now, now),
 
         // Create workspace for user (every user gets their own workspace)
-        c.env.DB.prepare(`
+        getDb(c.env).prepare(`
           INSERT INTO workspaces (id, name, slug, owner_id, plan_type, created_at, updated_at)
           VALUES (?, ?, ?, ?, 'free', ?, ?)
         `)
@@ -96,7 +86,7 @@ auth.post(
           ),
 
         // Add user as workspace member (owner role)
-        c.env.DB.prepare(`
+        getDb(c.env).prepare(`
           INSERT INTO workspace_members (id, user_id, workspace_id, role, invited_at, joined_at)
           VALUES (?, ?, ?, 'owner', ?, ?)
         `)
@@ -104,7 +94,7 @@ auth.post(
       ];
 
       // Execute batch
-      await c.env.DB.batch(batch);
+      await getDb(c.env).batch(batch);
 
       // Generate JWT tokens
       const tokens = await generateTokens({
@@ -167,7 +157,7 @@ auth.post(
 
     try {
       // Find user by email
-      const user = await c.env.DB.prepare(
+      const user = await getDb(c.env).prepare(
         'SELECT id, email, password_hash, name, email_verified, created_at, updated_at FROM users WHERE email = ?'
       )
         .bind(email.toLowerCase())
@@ -191,7 +181,7 @@ auth.post(
       }
 
       // Get user's workspace (assume first workspace for now, can be expanded later)
-      const workspaceMember = await c.env.DB.prepare(
+      const workspaceMember = await getDb(c.env).prepare(
         'SELECT workspace_id FROM workspace_members WHERE user_id = ? AND role = ? LIMIT 1'
       )
         .bind(user.id, 'owner')
@@ -205,7 +195,7 @@ auth.post(
       }
 
       // Get workspace details
-      const workspace = await c.env.DB.prepare(
+      const workspace = await getDb(c.env).prepare(
         'SELECT id, name, slug, owner_id, plan_type, created_at, updated_at FROM workspaces WHERE id = ?'
       )
         .bind(workspaceMember.workspace_id)
@@ -290,7 +280,7 @@ auth.post(
       const { userId } = JSON.parse(tokenData);
 
       // Update user email_verified status
-      await c.env.DB.prepare(
+      await getDb(c.env).prepare(
         'UPDATE users SET email_verified = 1, updated_at = ? WHERE id = ?'
       )
         .bind(Date.now(), userId)
@@ -331,7 +321,7 @@ auth.post(
         const { email }: ResetPasswordInput = body;
 
         // Find user by email
-        const user = await c.env.DB.prepare(
+        const user = await getDb(c.env).prepare(
           'SELECT id, email FROM users WHERE email = ?'
         )
           .bind(email.toLowerCase())
@@ -389,7 +379,7 @@ auth.post(
         const newPasswordHash = await hashPassword(newPassword);
 
         // Update password
-        await c.env.DB.prepare(
+        await getDb(c.env).prepare(
           'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?'
         )
           .bind(newPasswordHash, Date.now(), userId)

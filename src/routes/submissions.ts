@@ -3,18 +3,8 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
 import { checkRateLimit, getClientIP, createRateLimitHeaders } from '../utils/rateLimit';
-import type { HonoContext } from '../types/index';
-
-// Environment bindings type
-type Env = {
-  DB: D1Database;
-  FORM_CACHE: KVNamespace;
-  SESSION_STORE: KVNamespace;
-  EMAIL_TOKENS: KVNamespace;
-  RATE_LIMIT: KVNamespace;
-  JWT_SECRET: string;
-  ENVIRONMENT: string;
-};
+import type { Env, HonoContext } from '../types/index';
+import { getDb } from '../db/db';
 
 // Create submissions router
 const submissions = new Hono<{
@@ -23,7 +13,7 @@ const submissions = new Hono<{
 }>();
 
 // Submission data schema (dynamic based on form schema, but a base for now)
-const submissionSchema = z.record(z.any());
+const submissionSchema = z.record(z.string(), z.any());
 
 // Query schemas for submission listing
 const listSubmissionsQuerySchema = z.object({
@@ -46,7 +36,7 @@ const checkWorkspaceMembership = async (c: any, workspaceId: string) => {
     }, 401);
   }
 
-  const member = await c.env.DB.prepare(
+  const member = await getDb(c.env).prepare(
     'SELECT role FROM workspace_members WHERE user_id = ? AND workspace_id = ?'
   )
     .bind(userId, workspaceId)
@@ -74,7 +64,7 @@ submissions.post(
 
     try {
       // 1. Validate form existence and published status
-      const form = await c.env.DB.prepare(
+      const form = await getDb(c.env).prepare(
         'SELECT id, schema, status, workspace_id FROM forms WHERE id = ? AND deleted_at IS NULL'
       )
         .bind(formId)
@@ -126,7 +116,7 @@ submissions.post(
       const userAgent = c.req.header('User-Agent') || 'unknown';
       const referrer = c.req.header('Referer') || null;
 
-      await c.env.DB.prepare(`
+      await getDb(c.env).prepare(`
         INSERT INTO submissions (id, form_id, data, ip_address, user_agent, referrer, submitted_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
@@ -211,7 +201,7 @@ submissions.get(
       if (membershipCheck instanceof Response) return membershipCheck;
 
       // Verify form exists and belongs to workspace
-      const form = await c.env.DB.prepare(
+      const form = await getDb(c.env).prepare(
         'SELECT id, workspace_id FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
@@ -260,7 +250,7 @@ submissions.get(
       const limit = query.limit || 50;
       const whereClause = conditions.join(' AND ');
 
-      const submissions = await c.env.DB.prepare(`
+      const submissions = await getDb(c.env).prepare(`
         SELECT s.id, s.form_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at
         FROM submissions s
         WHERE ${whereClause}
@@ -299,7 +289,7 @@ submissions.get(
       }
 
       // Count total submissions for this form
-      const totalCount = await c.env.DB.prepare(
+      const totalCount = await getDb(c.env).prepare(
         'SELECT COUNT(*) as count FROM submissions WHERE form_id = ?'
       )
         .bind(formId)
@@ -345,7 +335,7 @@ submissions.get(
       if (membershipCheck instanceof Response) return membershipCheck;
 
       // Get submission with form validation
-      const submission = await c.env.DB.prepare(`
+      const submission = await getDb(c.env).prepare(`
         SELECT s.id, s.form_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at,
                f.workspace_id, f.title as form_title
         FROM submissions s
@@ -403,7 +393,7 @@ submissions.delete(
       if (membershipCheck instanceof Response) return membershipCheck;
 
       // Verify form exists and belongs to workspace
-      const form = await c.env.DB.prepare(
+      const form = await getDb(c.env).prepare(
         'SELECT id, workspace_id FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
@@ -417,7 +407,7 @@ submissions.delete(
       }
 
       // Check if submission exists
-      const submission = await c.env.DB.prepare(
+      const submission = await getDb(c.env).prepare(
         'SELECT id, data FROM submissions WHERE id = ? AND form_id = ?'
       )
         .bind(submissionId, formId)
@@ -432,7 +422,7 @@ submissions.delete(
 
       // Delete submission (soft delete or hard delete based on role)
       // Currently doing hard delete. Could change to soft delete if needed.
-      await c.env.DB.prepare(
+      await getDb(c.env).prepare(
         'DELETE FROM submissions WHERE id = ? AND form_id = ?'
       )
         .bind(submissionId, formId)

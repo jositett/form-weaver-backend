@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import type { Env } from '../index';
-import type { HonoContext } from '../types/index';
+import type { Env, HonoContext } from '../types/index';
+import { getDb } from '../db/db';
 
 const files = new Hono<{
   Bindings: Env;
@@ -31,7 +31,7 @@ files.post('/:formId/upload', async (c) => {
 
   try {
     // Verify form exists and belongs to workspace
-    const form = await c.env.DB.prepare(
+    const form = await getDb(c.env).prepare(
       'SELECT id FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
     ).bind(formId, workspaceId).first();
 
@@ -76,7 +76,7 @@ files.post('/:formId/upload', async (c) => {
     const fileId = crypto.randomUUID();
     const now = Date.now();
 
-    await c.env.DB.prepare(
+    await getDb(c.env).prepare(
       'INSERT INTO files (id, workspace_id, original_name, file_name, mime_type, size, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).bind(
       fileId,
@@ -123,7 +123,7 @@ files.get('/:fileId', async (c) => {
 
   try {
     // Get file metadata
-    const file = await c.env.DB.prepare(
+    const file = await getDb(c.env).prepare(
       'SELECT * FROM files WHERE id = ? AND workspace_id = ?'
     ).bind(fileId, workspaceId).first() as any;
 
@@ -167,7 +167,7 @@ files.delete('/:fileId', async (c) => {
 
   try {
     // Get file metadata
-    const file = await c.env.DB.prepare(
+    const file = await getDb(c.env).prepare(
       'SELECT * FROM files WHERE id = ? AND workspace_id = ?'
     ).bind(fileId, workspaceId).first() as any;
 
@@ -179,7 +179,7 @@ files.delete('/:fileId', async (c) => {
     await c.env.FILE_UPLOADS.delete(file.file_name);
 
     // Delete from database
-    await c.env.DB.prepare('DELETE FROM files WHERE id = ?').bind(fileId).run();
+    await getDb(c.env).prepare('DELETE FROM files WHERE id = ?').bind(fileId).run();
 
     return c.json({ message: 'File deleted successfully' });
 
