@@ -13,6 +13,19 @@ interface AnalyticsResponse {
   views: { date: string; count: number }[];
   submissionRate: { date: string; count: number }[];
   fieldAnalytics?: FieldAnalytics;
+  peakSubmissionTimes?: PeakSubmissionTimes;
+}
+
+interface PeakSubmissionTimes {
+  hourlyDistribution: HourlyData[];
+  peakHour: number; // 0-23
+  peakHourCount: number;
+}
+
+interface HourlyData {
+  hour: number; // 0-23
+  count: number;
+  percentage: number; // 0.0 to 1.0
 }
 
 interface FieldAnalytics {
@@ -381,18 +394,60 @@ analyticsRouter.get(
         WHERE form_id = ?
       `).bind(formId);
 
+      // 6. Peak submission times - hourly distribution
+      let peakSubmissionTimesQuery;
+      if (dateFromSeconds || dateToSeconds) {
+        // Build conditional query for peak submission times with date range
+        let conditions = ['form_id = ?'];
+        const params = [formId];
+
+        if (dateFromSeconds) {
+          conditions.push('submitted_at >= ?');
+          params.push(String(dateFromSeconds));
+        }
+
+        if (dateToSeconds) {
+          conditions.push('submitted_at <= ?');
+          params.push(String(dateToSeconds));
+        }
+
+        const whereClause = conditions.join(' AND ');
+        peakSubmissionTimesQuery = db.prepare(`
+          SELECT
+            strftime('%H', submitted_at, 'unixepoch') AS hour,
+            COUNT(id) AS count
+          FROM submissions
+          WHERE ${whereClause}
+          GROUP BY hour
+          ORDER BY hour ASC
+        `).bind(...params.map(p => String(p)));
+      } else {
+        // Default: all submissions for hourly analysis
+        peakSubmissionTimesQuery = db.prepare(`
+          SELECT
+            strftime('%H', submitted_at, 'unixepoch') AS hour,
+            COUNT(id) AS count
+          FROM submissions
+          WHERE form_id = ?
+          GROUP BY hour
+          ORDER BY hour ASC
+        `).bind(formId);
+      }
+
       const [
         totalSubmissionsResult,
         submissionRateResult,
         formResult,
         totalViewsResult,
         averageTimeResult,
+        peakSubmissionTimesResult,
       ] = await db.batch([
         totalSubmissionsQuery,
         submissionRateQuery,
         formQuery,
         totalViewsQuery,
         averageTimeQuery,
+        peakSubmissionTimesQuery,
       ]);
 
       const totalSubmissions = (totalSubmissionsResult.results[0] as { totalSubmissions: number })?.totalSubmissions ?? 0;
@@ -403,8 +458,52 @@ analyticsRouter.get(
         averageCompletionTime: number | null;
         submissionsWithStartTime: number;
       };
+      const peakSubmissionTimesRaw = peakSubmissionTimesResult.results as { hour: string; count: number }[];
 
-      // 6. Field-level analytics (only if we have submissions and form schema)
+      // 7. Peak submission times analysis
+      let peakSubmissionTimes: PeakSubmissionTimes | undefined;
+
+      if (totalSubmissions > 0) {
+        try {
+          // Process hourly distribution data
+          const hourlyDistribution: HourlyData[] = [];
+          
+          // Create a map for quick lookup of hourly counts
+          const hourlyMap = new Map<number, number>();
+          peakSubmissionTimesRaw.forEach(item => {
+            const hour = parseInt(item.hour, 10);
+            hourlyMap.set(hour, item.count);
+          });
+
+          // Generate complete 24-hour distribution (0-23)
+          for (let hour = 0; hour < 24; hour++) {
+            const count = hourlyMap.get(hour) || 0;
+            const percentage = totalSubmissions > 0 ? count / totalSubmissions : 0;
+            
+            hourlyDistribution.push({
+              hour,
+              count,
+              percentage,
+            });
+          }
+
+          // Find peak hour
+          const peakHourData = hourlyDistribution.reduce((max, current) =>
+            current.count > max.count ? current : max
+          );
+
+          peakSubmissionTimes = {
+            hourlyDistribution,
+            peakHour: peakHourData.hour,
+            peakHourCount: peakHourData.count,
+          };
+        } catch (error) {
+          console.error('[Peak Submission Times Error]', error);
+          // Continue without peak submission times if there's an error
+        }
+      }
+
+      // 8. Field-level analytics (only if we have submissions and form schema)
       let fieldAnalytics: FieldAnalytics | undefined;
 
       if (totalSubmissions > 0 && form?.schema) {
@@ -417,7 +516,7 @@ analyticsRouter.get(
         }
       }
 
-      // 7. Calculate completion rate and average time
+      // 9. Calculate completion rate and average time
       const completionRate = totalViews > 0 ? totalSubmissions / totalViews : 0;
       const averageTime = averageTimeData.averageCompletionTime ?? 120;
 
@@ -429,6 +528,7 @@ analyticsRouter.get(
         views: [],
         submissionRate,
         fieldAnalytics,
+        peakSubmissionTimes,
       };
 
       // Cache the analytics data for 1 hour (3600 seconds)
