@@ -337,7 +337,7 @@ submissions.get(
 
       // Get submission with form validation
       const submission = await getDb(c.env).prepare(`
-        SELECT s.id, s.form_id, s.form_version_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at,
+        SELECT s.id, s.form_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at,
                f.workspace_id, f.title as form_title
         FROM submissions s
         JOIN forms f ON s.form_id = f.id
@@ -353,7 +353,7 @@ submissions.get(
         }, 404);
       }
 
-      // 2. Fetch associated file metadata
+      // 2. Fetch associated files via submission_files junction table
       interface FileDbRow {
         id: string;
         workspace_id: string;
@@ -363,13 +363,14 @@ submissions.get(
         size: number;
         uploaded_by: string;
         uploaded_at: number;
-        submission_id: string;
+        field_id: string;
       }
 
       const fileRows = await getDb(c.env).prepare(`
-        SELECT id, workspace_id, original_name, file_name, mime_type, size, uploaded_by, uploaded_at, submission_id
-        FROM files
-        WHERE submission_id = ? AND workspace_id = ?
+        SELECT f.id, f.workspace_id, f.original_name, f.file_name, f.mime_type, f.size, f.uploaded_by, f.uploaded_at, sf.field_id
+        FROM submission_files sf
+        JOIN files f ON sf.file_id = f.id
+        WHERE sf.submission_id = ? AND f.workspace_id = ?
       `)
         .bind(submissionId, workspaceId)
         .all() as { results: FileDbRow[] };
@@ -391,7 +392,8 @@ submissions.get(
             size: fileRow.size,
             uploadedBy: fileRow.uploaded_by,
             uploadedAt: fileRow.uploaded_at,
-            submissionId: fileRow.submission_id,
+            submissionId,
+            fieldId: fileRow.field_id,
             url,
           } as File;
         })
@@ -403,7 +405,6 @@ submissions.get(
         data: {
           id: submission.id,
           formId: submission.form_id,
-          formVersionId: submission.form_version_id,
           workspaceId: submission.workspace_id,
           formTitle: submission.form_title,
           data: JSON.parse(submission.data as string),

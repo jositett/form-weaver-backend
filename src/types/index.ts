@@ -112,13 +112,14 @@ export interface File {
   uploadedBy: string;
   uploadedAt: number;
   submissionId?: string; // Optional, as files can be uploaded before submission
+  fieldId?: string; // The form field ID this file was uploaded for
   url?: string; // The signed URL for download
 }
 
 export interface Submission {
   id: string;
   formId: string;
-  formVersionId: string;
+  formVersionId?: string; // Optional, available after migration
   workspaceId: string;
   data: Record<string, any>;
   submittedAt: number;
