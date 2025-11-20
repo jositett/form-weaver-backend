@@ -29,7 +29,7 @@ const forms = new Hono<{
 /**
  * Check workspace membership helper
  */
-const checkWorkspaceMembership = async (c: any, workspaceId: string) => {
+export const checkWorkspaceMembership = async (c: HonoContext, workspaceId: string): Promise<{ userId: string; role: string } | Response> => {
   const userId = c.get('userId');
   if (!userId) {
     return c.json({
@@ -42,7 +42,7 @@ const checkWorkspaceMembership = async (c: any, workspaceId: string) => {
     'SELECT role FROM workspace_members WHERE user_id = ? AND workspace_id = ?'
   )
     .bind(userId, workspaceId)
-    .first();
+    .first() as { role: string } | null;
 
   if (!member) {
     return c.json({
@@ -876,5 +876,11 @@ forms.patch(
     }
   }
 );
+
+// Mount nested routes
+import analyticsRouter from './analytics';
+
+// Mount analytics router at /:id
+forms.route('/:id', analyticsRouter);
 
 export default forms;
