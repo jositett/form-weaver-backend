@@ -4,6 +4,7 @@ export interface Env extends Bindings {
   DB: D1Database;
   FILE_UPLOADS: R2Bucket;
   FORM_CACHE: KVNamespace;
+  ANALYTICS_CACHE: KVNamespace;
   SESSION_STORE: KVNamespace;
   EMAIL_TOKENS: KVNamespace;
   RATE_LIMIT: KVNamespace;

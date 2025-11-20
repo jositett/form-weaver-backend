@@ -132,6 +132,12 @@ const formIdParamSchema = z.object({
   id: z.string().min(1).max(50), // 'id' is the param name from the parent route
 });
 
+const analyticsQuerySchema = z.object({
+  dateFrom: z.coerce.number().optional(), // Unix timestamp (milliseconds)
+  dateTo: z.coerce.number().optional(),   // Unix timestamp (milliseconds)
+  includeFieldAnalytics: z.coerce.boolean().default(true).optional(), // Enable field-level analytics
+});
+
 // --- Analytics Router ---
 
 const analyticsRouter = new Hono<{
@@ -147,8 +153,10 @@ analyticsRouter.get(
   '/analytics',
   authMiddleware,
   zValidator('param', formIdParamSchema),
+  zValidator('query', analyticsQuerySchema),
   async (c) => {
     const { id: formId } = c.req.valid('param');
+    const query = c.req.valid('query');
     const workspaceId = c.get('workspaceId')!;
 
     try {
@@ -161,24 +169,95 @@ analyticsRouter.get(
 
       const db = getDb(c.env);
 
-      // 1. Total Submissions
-      const totalSubmissionsQuery = db.prepare(
-        'SELECT COUNT(id) AS totalSubmissions FROM submissions WHERE form_id = ?'
-      ).bind(formId);
+      // Generate cache key based on formId and query parameters
+      const cacheKey = `analytics:${formId}:${query.dateFrom || 'default'}:${query.dateTo || 'default'}:${query.includeFieldAnalytics}`;
 
-      // 2. Submission Rate (last 30 days)
-      // submitted_at is a Unix timestamp (seconds)
-      const submissionRateQuery = db.prepare(`
-        SELECT
-          strftime('%Y-%m-%d', submitted_at, 'unixepoch') AS date,
-          COUNT(id) AS count
-        FROM submissions
-        WHERE
-          form_id = ? AND
-          submitted_at >= strftime('%s', 'now', '-30 days')
-        GROUP BY date
-        ORDER BY date ASC
-      `).bind(formId);
+      // Try to get cached analytics data first (1 hour TTL)
+      try {
+        const cachedAnalytics = await c.env.ANALYTICS_CACHE.get(cacheKey, 'json') as AnalyticsResponse | null;
+        if (cachedAnalytics) {
+          return c.json<AnalyticsResponse>({
+            success: true,
+            data: cachedAnalytics,
+            message: `Analytics for form ${formId} in workspace ${workspaceId} (cached)`,
+            cached: true,
+          } as any);
+        }
+      } catch (cacheError) {
+        // Continue without caching if KV is unavailable
+        console.warn('[Analytics Cache Error]', cacheError);
+      }
+
+      // Convert milliseconds to seconds for SQLite timestamp comparison
+      const dateFromSeconds = query.dateFrom ? Math.floor(query.dateFrom / 1000) : undefined;
+      const dateToSeconds = query.dateTo ? Math.floor(query.dateTo / 1000) : undefined;
+
+      // 1. Total Submissions (with optional date range filtering)
+      let totalSubmissionsQuery;
+      let submissionRateQuery;
+
+      if (dateFromSeconds || dateToSeconds) {
+        // Build conditional query for total submissions with date range
+        let conditions = ['form_id = ?'];
+        const params = [formId];
+
+        if (dateFromSeconds) {
+          conditions.push('submitted_at >= ?');
+          params.push(String(dateFromSeconds));
+        }
+
+        if (dateToSeconds) {
+          conditions.push('submitted_at <= ?');
+          params.push(String(dateToSeconds));
+        }
+
+        const whereClause = conditions.join(' AND ');
+        totalSubmissionsQuery = db.prepare(
+          `SELECT COUNT(id) AS totalSubmissions FROM submissions WHERE ${whereClause}`
+        ).bind(...params.map(p => String(p)));
+
+        // 2. Submission Rate with date range filtering
+        let dateConditions = ['form_id = ?'];
+        const dateParams = [formId];
+
+        if (dateFromSeconds) {
+          dateConditions.push('submitted_at >= ?');
+          dateParams.push(String(dateFromSeconds));
+        }
+
+        if (dateToSeconds) {
+          dateConditions.push('submitted_at <= ?');
+          dateParams.push(String(dateToSeconds));
+        }
+
+        const dateWhereClause = dateConditions.join(' AND ');
+        submissionRateQuery = db.prepare(`
+          SELECT
+            strftime('%Y-%m-%d', submitted_at, 'unixepoch') AS date,
+            COUNT(id) AS count
+          FROM submissions
+          WHERE ${dateWhereClause}
+          GROUP BY date
+          ORDER BY date ASC
+        `).bind(...dateParams.map(p => String(p)));
+      } else {
+        // Default behavior: all submissions, last 30 days for submission rate
+        totalSubmissionsQuery = db.prepare(
+          'SELECT COUNT(id) AS totalSubmissions FROM submissions WHERE form_id = ?'
+        ).bind(formId);
+
+        submissionRateQuery = db.prepare(`
+          SELECT
+            strftime('%Y-%m-%d', submitted_at, 'unixepoch') AS date,
+            COUNT(id) AS count
+          FROM submissions
+          WHERE
+            form_id = ? AND
+            submitted_at >= strftime('%s', 'now', '-30 days')
+          GROUP BY date
+          ORDER BY date ASC
+        `).bind(formId);
+      }
 
       // 3. Get form schema to analyze fields
       const formQuery = db.prepare(
@@ -224,10 +303,21 @@ analyticsRouter.get(
         fieldAnalytics,
       };
 
+      // Cache the analytics data for 1 hour (3600 seconds)
+      try {
+        await c.env.ANALYTICS_CACHE.put(cacheKey, JSON.stringify(analyticsData), {
+          expirationTtl: 3600, // 1 hour
+        });
+      } catch (cacheError) {
+        // Log cache error but don't fail the request
+        console.warn('[Analytics Cache Put Error]', cacheError);
+      }
+
       return c.json<AnalyticsResponse>({
         success: true,
         data: analyticsData,
         message: `Analytics for form ${formId} in workspace ${workspaceId}`,
+        cached: false,
       } as any);
 
     } catch (error) {
