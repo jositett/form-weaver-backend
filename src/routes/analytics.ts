@@ -362,21 +362,49 @@ analyticsRouter.get(
         'SELECT schema FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       ).bind(formId, workspaceId);
 
+      // 4. Get total views for completion rate calculation
+      const totalViewsQuery = db.prepare(
+        'SELECT COUNT(id) AS totalViews FROM form_views WHERE form_id = ?'
+      ).bind(formId);
+
+      // 5. Calculate average time (completion time)
+      const averageTimeQuery = db.prepare(`
+        SELECT
+          AVG(
+            CASE
+              WHEN started_at IS NOT NULL THEN (submitted_at - started_at)
+              ELSE NULL
+            END
+          ) AS averageCompletionTime,
+          COUNT(CASE WHEN started_at IS NOT NULL THEN 1 END) AS submissionsWithStartTime
+        FROM submissions
+        WHERE form_id = ?
+      `).bind(formId);
+
       const [
         totalSubmissionsResult,
         submissionRateResult,
         formResult,
+        totalViewsResult,
+        averageTimeResult,
       ] = await db.batch([
         totalSubmissionsQuery,
         submissionRateQuery,
         formQuery,
+        totalViewsQuery,
+        averageTimeQuery,
       ]);
 
       const totalSubmissions = (totalSubmissionsResult.results[0] as { totalSubmissions: number })?.totalSubmissions ?? 0;
       const submissionRate = submissionRateResult.results as { date: string; count: number }[];
       const form = formResult.results[0] as { schema: string } | undefined;
+      const totalViews = (totalViewsResult.results[0] as { totalViews: number })?.totalViews ?? 0;
+      const averageTimeData = averageTimeResult.results[0] as {
+        averageCompletionTime: number | null;
+        submissionsWithStartTime: number;
+      };
 
-      // 4. Field-level analytics (only if we have submissions and form schema)
+      // 6. Field-level analytics (only if we have submissions and form schema)
       let fieldAnalytics: FieldAnalytics | undefined;
 
       if (totalSubmissions > 0 && form?.schema) {
@@ -389,12 +417,14 @@ analyticsRouter.get(
         }
       }
 
+      // 7. Calculate completion rate and average time
+      const completionRate = totalViews > 0 ? totalSubmissions / totalViews : 0;
+      const averageTime = averageTimeData.averageCompletionTime ?? 120;
+
       const analyticsData: AnalyticsResponse = {
         totalSubmissions,
-        // Placeholder: Assume all submissions are complete for now
-        completionRate: 1.0,
-        // Placeholder: Time tracking schema not defined
-        averageTime: 120,
+        completionRate,
+        averageTime,
         // Placeholder: View tracking is a separate task
         views: [],
         submissionRate,
