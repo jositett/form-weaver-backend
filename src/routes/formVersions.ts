@@ -1,7 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { Env, FormVersionListItem, FormVersion } from '../types/index';
-import { getDb, generateId } from '../db/db';
+import { Env, FormVersionListItem, FormVersion, HonoContext } from '../types/index';
+import { getDb } from '../db/db';
+import { authMiddleware } from '../middleware/auth';
+
+// Generate random ID (simple implementation)
+const generateId = (): string => {
+  return crypto.randomUUID();
+};
 import { zValidator } from '@hono/zod-validator';
 import {
   formIdParamSchema,
@@ -12,7 +18,10 @@ import {
   ListFormVersionsQuery
 } from '../utils/validation';
 
-const formVersionsRouter = new Hono<{ Bindings: Env }>();
+const formVersionsRouter = new Hono<{
+  Bindings: Env;
+  Variables: HonoContext;
+}>();
 
 const createFormVersionBodySchema = z.object({
   version_notes: z.string().max(500).optional(),
@@ -23,13 +32,14 @@ type CreateFormVersionBody = z.infer<typeof createFormVersionBodySchema>;
 // POST /api/forms/:id/versions - Create a new version for a form
 formVersionsRouter.post(
   '/forms/:id/versions',
+  authMiddleware,
   zValidator('param', formIdParamSchema),
   zValidator('json', createFormVersionBodySchema),
   async (c) => {
     const { id: formId } = c.req.valid('param') as FormIdParam;
     const { version_notes } = c.req.valid('json') as CreateFormVersionBody;
     const workspaceId = c.get('workspaceId');
-    const db = getDb(c);
+    const db = getDb(c.env);
 
     if (!workspaceId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -109,13 +119,14 @@ formVersionsRouter.post(
 // GET /api/forms/:id/versions - List all versions for a form with cursor-based pagination
 formVersionsRouter.get(
   '/forms/:id/versions',
+  authMiddleware,
   zValidator('param', formIdParamSchema),
   zValidator('query', listFormVersionsQuerySchema),
   async (c) => {
     const { id: formId } = c.req.valid('param') as FormIdParam;
     const { limit, cursor } = c.req.valid('query') as ListFormVersionsQuery;
     const workspaceId = c.get('workspaceId');
-    const db = getDb(c);
+    const db = getDb(c.env);
 
     if (!workspaceId) {
       // This should be caught by auth middleware, but as a safeguard
@@ -183,11 +194,12 @@ formVersionsRouter.get(
 // GET /api/forms/:id/versions/:versionId - Retrieve a specific form version
 formVersionsRouter.get(
   '/forms/:id/versions/:versionId',
+  authMiddleware,
   zValidator('param', formVersionIdParamSchema),
   async (c) => {
     const { id: formId, versionId } = c.req.valid('param') as FormVersionIdParam;
     const workspaceId = c.get('workspaceId');
-    const db = getDb(c);
+    const db = getDb(c.env);
 
     if (!workspaceId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -224,11 +236,12 @@ formVersionsRouter.get(
 // POST /api/forms/:id/versions/:versionId/restore - Restore a previous version of a form
 formVersionsRouter.post(
   '/forms/:id/versions/:versionId/restore',
+  authMiddleware,
   zValidator('param', formVersionIdParamSchema),
   async (c) => {
     const { id: formId, versionId } = c.req.valid('param') as FormVersionIdParam;
     const workspaceId = c.get('workspaceId');
-    const db = getDb(c);
+    const db = getDb(c.env);
 
     if (!workspaceId) {
       return c.json({ error: 'Unauthorized' }, 401);

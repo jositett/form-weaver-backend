@@ -15,6 +15,7 @@ REFRESH_TOKEN_EXPIRES_IN = "30d"
 # JWT_SECRET
 # STRIPE_SECRET_KEY
 # STRIPE_WEBHOOK_SECRET
+# RESEND_API_KEY (optional - for email notifications)
 
 # D1 Database
 [[d1_databases]]
@@ -39,6 +40,10 @@ id = "local-email-tokens"
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
 id = "local-rate-limit"
+
+[[kv_namespaces]]
+binding = "ANALYTICS_CACHE"
+id = "local-analytics-cache"
 
 # R2 Buckets (for file uploads)
 [[r2_buckets]]

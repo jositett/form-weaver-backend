@@ -90,6 +90,8 @@ export interface FormVersion {
   created_at: string; // ISO 8601 timestamp
   is_active: number; // 0 or 1
   version_notes: string | null; // Added for versioning feature
+}
+
 export interface FormVersionListItem {
   id: string;
   form_id: string;
@@ -100,11 +102,97 @@ export interface FormVersionListItem {
 
 // Hono context bindings
 
-export interface HonoContext {
+export interface File {
+  id: string;
+  workspaceId: string;
+  originalName: string;
+  fileName: string; // The key in R2
+  mimeType: string;
+  size: number;
+  uploadedBy: string;
+  uploadedAt: number;
+  submissionId?: string; // Optional, as files can be uploaded before submission
+  url?: string; // The signed URL for download
+}
+
+export interface Submission {
+  id: string;
+  formId: string;
+  formVersionId: string;
+  workspaceId: string;
+  data: Record<string, any>;
+  submittedAt: number;
+  submittedBy?: string;
+  files?: File[]; // Array of associated files with signed URLs
+}
+
 export interface HonoContext {
   userId?: string;
   workspaceId?: string;
   userRole?: string;
 }
 
-export { Env } from './Env';
+// Email notification types
+export interface FormNotification {
+  id: string;
+  formId: string;
+  workspaceId: string;
+  enabled: boolean;
+  notifyOnSubmission: boolean;
+  notifyOnDailySummary: boolean;
+  notifyOnWeeklyReport: boolean;
+  recipientEmails: string[]; // Array of email addresses
+  emailTemplateId?: string;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string;
+}
+
+export interface NotificationHistory {
+  id: string;
+  formId: string;
+  workspaceId: string;
+  notificationType: 'submission' | 'daily_summary' | 'weekly_report';
+  recipientEmail: string;
+  subject: string;
+  status: 'pending' | 'sent' | 'failed' | 'bounced';
+  sentAt?: number;
+  errorMessage?: string;
+  submissionId?: string;
+  emailServiceId?: string;
+  createdAt: number;
+}
+
+export interface EmailTemplate {
+  id: string;
+  workspaceId: string;
+  name: string;
+  templateType: 'submission' | 'daily_summary' | 'weekly_report';
+  subjectTemplate: string;
+  bodyTemplate: string; // HTML template with placeholders
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string;
+}
+
+export interface CreateNotificationRequest {
+  enabled?: boolean;
+  notifyOnSubmission?: boolean;
+  notifyOnDailySummary?: boolean;
+  notifyOnWeeklyReport?: boolean;
+  recipientEmails: string[];
+  emailTemplateId?: string;
+}
+
+export interface UpdateNotificationRequest {
+  enabled?: boolean;
+  notifyOnSubmission?: boolean;
+  notifyOnDailySummary?: boolean;
+  notifyOnWeeklyReport?: boolean;
+  recipientEmails?: string[];
+  emailTemplateId?: string;
+}
+
+export type { Env } from './Env';

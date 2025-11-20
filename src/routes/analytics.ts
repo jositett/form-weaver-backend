@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
-import { checkWorkspaceMembership } from './forms';
+import { checkWorkspaceMembership } from '../utils/workspace';
 import type { Env, HonoContext } from '../types/index';
 import { getDb } from '../db/db';
 
@@ -144,6 +144,104 @@ const analyticsRouter = new Hono<{
   Bindings: Env;
   Variables: HonoContext;
 }>();
+
+/**
+ * GET /:id/analytics/views - Get form views analytics
+ * (Resolves to /api/forms/:formId/analytics/views)
+ */
+analyticsRouter.get(
+  '/analytics/views',
+  authMiddleware,
+  zValidator('param', formIdParamSchema),
+  zValidator('query', analyticsQuerySchema),
+  async (c) => {
+    const { id: formId } = c.req.valid('param');
+    const query = c.req.valid('query');
+    const workspaceId = c.get('workspaceId')!;
+
+    try {
+      // Check workspace membership
+      const membershipCheck = await checkWorkspaceMembership(c, workspaceId);
+      if (membershipCheck instanceof Response) return membershipCheck;
+
+      const db = getDb(c.env);
+
+      // Convert milliseconds to seconds for SQLite timestamp comparison
+      const dateFromSeconds = query.dateFrom ? Math.floor(query.dateFrom / 1000) : undefined;
+      const dateToSeconds = query.dateTo ? Math.floor(query.dateTo / 1000) : undefined;
+
+      // Build query for form views with optional date range
+      let viewsQuery;
+      if (dateFromSeconds || dateToSeconds) {
+        let conditions = ['form_id = ?'];
+        const params = [formId];
+
+        if (dateFromSeconds) {
+          conditions.push('viewed_at >= ?');
+          params.push(String(dateFromSeconds));
+        }
+
+        if (dateToSeconds) {
+          conditions.push('viewed_at <= ?');
+          params.push(String(dateToSeconds));
+        }
+
+        const whereClause = conditions.join(' AND ');
+        viewsQuery = db.prepare(`
+          SELECT
+            strftime('%Y-%m-%d', viewed_at, 'unixepoch') AS date,
+            COUNT(id) AS count
+          FROM form_views
+          WHERE ${whereClause}
+          GROUP BY date
+          ORDER BY date ASC
+        `).bind(...params.map(p => String(p)));
+      } else {
+        // Default: last 30 days
+        viewsQuery = db.prepare(`
+          SELECT
+            strftime('%Y-%m-%d', viewed_at, 'unixepoch') AS date,
+            COUNT(id) AS count
+          FROM form_views
+          WHERE
+            form_id = ? AND
+            viewed_at >= strftime('%s', 'now', '-30 days')
+          GROUP BY date
+          ORDER BY date ASC
+        `).bind(formId);
+      }
+
+      // Get total views count
+      const totalViewsQuery = db.prepare(
+        'SELECT COUNT(id) AS totalViews FROM form_views WHERE form_id = ?'
+      ).bind(formId);
+
+      const [viewsResult, totalViewsResult] = await db.batch([
+        viewsQuery,
+        totalViewsQuery,
+      ]);
+
+      const views = viewsResult.results as { date: string; count: number }[];
+      const totalViews = (totalViewsResult.results[0] as { totalViews: number })?.totalViews ?? 0;
+
+      return c.json({
+        success: true,
+        data: {
+          totalViews,
+          views,
+        },
+        message: `Form views analytics for form ${formId}`,
+      });
+
+    } catch (error) {
+      console.error('[Get Form Views Error]', error);
+      return c.json({
+        success: false,
+        error: 'Failed to get form views analytics',
+      }, 500);
+    }
+  }
+);
 
 /**
  * GET /:id/analytics - Get form analytics

@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
 import { checkRateLimit, getClientIP, createRateLimitHeaders } from '../utils/rateLimit';
-import type { Env, HonoContext } from '../types/index';
+import type { Env, HonoContext, File, Submission } from '../types/index';
 import { getDb } from '../db/db';
+import { getSignedFileUrl } from '../utils/files';
 
 // Create submissions router
 const submissions = new Hono<{
@@ -336,14 +337,14 @@ submissions.get(
 
       // Get submission with form validation
       const submission = await getDb(c.env).prepare(`
-        SELECT s.id, s.form_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at,
+        SELECT s.id, s.form_id, s.form_version_id, s.data, s.ip_address, s.user_agent, s.referrer, s.submitted_at,
                f.workspace_id, f.title as form_title
         FROM submissions s
         JOIN forms f ON s.form_id = f.id
         WHERE s.id = ? AND s.form_id = ? AND f.workspace_id = ? AND f.deleted_at IS NULL
       `)
         .bind(submissionId, formId, workspaceId)
-        .first();
+        .first() as any; // Cast to any for now, will be mapped to Submission type
 
       if (!submission) {
         return c.json({
@@ -352,18 +353,66 @@ submissions.get(
         }, 404);
       }
 
+      // 2. Fetch associated file metadata
+      interface FileDbRow {
+        id: string;
+        workspace_id: string;
+        original_name: string;
+        file_name: string;
+        mime_type: string;
+        size: number;
+        uploaded_by: string;
+        uploaded_at: number;
+        submission_id: string;
+      }
+
+      const fileRows = await getDb(c.env).prepare(`
+        SELECT id, workspace_id, original_name, file_name, mime_type, size, uploaded_by, uploaded_at, submission_id
+        FROM files
+        WHERE submission_id = ? AND workspace_id = ?
+      `)
+        .bind(submissionId, workspaceId)
+        .all() as { results: FileDbRow[] };
+
+      // 3. Generate signed URLs for each file and map to camelCase File type
+      const filesWithUrls: File[] = await Promise.all(
+        fileRows.results.map(async (fileRow) => {
+          const url = await getSignedFileUrl(
+            c.env.FILE_UPLOADS,
+            fileRow.file_name,
+            fileRow.original_name
+          );
+          return {
+            id: fileRow.id,
+            workspaceId: fileRow.workspace_id,
+            originalName: fileRow.original_name,
+            fileName: fileRow.file_name,
+            mimeType: fileRow.mime_type,
+            size: fileRow.size,
+            uploadedBy: fileRow.uploaded_by,
+            uploadedAt: fileRow.uploaded_at,
+            submissionId: fileRow.submission_id,
+            url,
+          } as File;
+        })
+      );
+
+      // 4. Construct final response
       return c.json({
         success: true,
         data: {
           id: submission.id,
           formId: submission.form_id,
+          formVersionId: submission.form_version_id,
+          workspaceId: submission.workspace_id,
           formTitle: submission.form_title,
           data: JSON.parse(submission.data as string),
           ipAddress: submission.ip_address,
           userAgent: submission.user_agent,
           referrer: submission.referrer,
           submittedAt: submission.submitted_at,
-        },
+          files: filesWithUrls,
+        } as Submission & { formTitle: string }, // Cast to ensure type safety with extra field
       });
 
     } catch (error) {
@@ -490,24 +539,15 @@ interface NotificationPayload {
 
 /**
  * Send email notifications for a form submission
- * TODO: Implement when email service and notifications table are ready
  */
 async function sendNotificationEmails(
   env: Env,
   formId: string,
   payload: NotificationPayload
 ): Promise<void> {
-  console.log(`[Email Notification] Would send notifications for form ${formId}`, {
-    submissionId: payload.id,
-    data: payload.data,
-    timestamp: new Date(payload.submittedAt).toISOString(),
-  });
-
-  // TODO: Query form_notifications table for configured notifications
-  // TODO: Integrate with email service (Resend, SendGrid, etc.)
-  // TODO: Send email templates based on notification preferences
-  // TODO: Handle email delivery errors
-  // TODO: For now, this is a no-op placeholder
+  // Import the actual implementation
+  const { sendSubmissionNotification } = await import('./emailNotifications');
+  await sendSubmissionNotification(env, formId, payload.data);
 }
 
 export default submissions;

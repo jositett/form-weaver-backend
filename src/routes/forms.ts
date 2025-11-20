@@ -14,6 +14,7 @@ import {
 } from '../utils/validation';
 import type { Env, HonoContext } from '../types/index';
 import { getDb } from '../db/db';
+import { checkWorkspaceMembership } from '../utils/workspace';
 
 // Generate random ID (simple implementation)
 const generateId = (): string => {
@@ -25,34 +26,6 @@ const forms = new Hono<{
   Bindings: Env;
   Variables: HonoContext;
 }>();
-
-/**
- * Check workspace membership helper
- */
-export const checkWorkspaceMembership = async (c: HonoContext, workspaceId: string): Promise<{ userId: string; role: string } | Response> => {
-  const userId = c.get('userId');
-  if (!userId) {
-    return c.json({
-      success: false,
-      error: 'Authentication required',
-    }, 401);
-  }
-
-  const member = await c.env.DB.prepare(
-    'SELECT role FROM workspace_members WHERE user_id = ? AND workspace_id = ?'
-  )
-    .bind(userId, workspaceId)
-    .first() as { role: string } | null;
-
-  if (!member) {
-    return c.json({
-      success: false,
-      error: 'Access denied: not a member of this workspace',
-    }, 403);
-  }
-
-  return { userId, role: member.role };
-};
 
 /**
  * POST /forms - Create new form
@@ -879,8 +852,12 @@ forms.patch(
 
 // Mount nested routes
 import analyticsRouter from './analytics';
+import emailNotificationsRouter from './emailNotifications';
 
 // Mount analytics router at /:id
 forms.route('/:id', analyticsRouter);
+
+// Mount email notifications router at /:id
+forms.route('/:id', emailNotificationsRouter);
 
 export default forms;
