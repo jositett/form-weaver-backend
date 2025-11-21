@@ -113,7 +113,7 @@ export const formVersionIdParamSchema = z.object({
 export type FormVersionIdParam = z.infer<typeof formVersionIdParamSchema>;
 
 export const listFormVersionsQuerySchema = z.object({
-  limit: z.string().transform(val => Math.min(parseInt(val || '50'), 100)).optional().default(50),
+  limit: z.coerce.number().min(1).max(100).default(50),
   cursor: z.string().uuid('Invalid UUID format for cursor').optional(),
 });
 

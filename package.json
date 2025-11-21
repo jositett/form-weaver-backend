@@ -6,6 +6,8 @@
   "scripts": {
     "d1:create": "wrangler d1 create formweaver-dev",
     "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts --fix",
+    "lint:check": "eslint src --ext .ts",
     "deploy": "wrangler deploy",
     "d1:list": "wrangler d1 list",
     "d1:migrate:prod": "wrangler d1 migrations apply formweaver-dev --remote",
@@ -19,17 +21,20 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@hono/zod-validator": "^0.7.4",
-    "bcryptjs": "^3.0.3",
-    "hono": "^4.10.6",
-    "jose": "^6.1.2",
-    "zod": "^4.1.12"
+    "@hono/zod-validator": "^0.4.1",
+    "bcryptjs": "^2.4.3",
+    "hono": "^4.6.11",
+    "jose": "^5.9.6",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251115.0",
+    "@cloudflare/workers-types": "^4.20241218.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^24.10.1",
-    "typescript": "^5.9.3",
-    "wrangler": "^4.47.0"
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.2",
+    "@typescript-eslint/parser": "^8.18.2",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.50.0"
   }
 }

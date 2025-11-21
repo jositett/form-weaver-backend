@@ -8,50 +8,6 @@ import { getDb } from '../db/db';
 
 // --- Types ---
 
-interface EmailNotificationSettings {
-  id: string;
-  formId: string;
-  workspaceId: string;
-  enabled: boolean;
-  notifyOnSubmission: boolean;
-  notifyOnDailySummary: boolean;
-  notifyOnWeeklyReport: boolean;
-  recipientEmails: string[];
-  emailTemplateId?: string;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
-}
-
-interface NotificationHistory {
-  id: string;
-  formId: string;
-  workspaceId: string;
-  notificationType: 'submission' | 'daily_summary' | 'weekly_report';
-  recipientEmail: string;
-  subject: string;
-  status: 'pending' | 'sent' | 'failed' | 'bounced';
-  sentAt?: number;
-  errorMessage?: string;
-  submissionId?: string;
-  emailServiceId?: string;
-  createdAt: number;
-}
-
-interface EmailTemplate {
-  id: string;
-  workspaceId: string;
-  name: string;
-  templateType: 'submission' | 'daily_summary' | 'weekly_report';
-  subjectTemplate: string;
-  bodyTemplate: string;
-  isDefault: boolean;
-  isActive: boolean;
-  createdAt: number;
-  updatedAt: number;
-  createdBy: string;
-}
-
 // --- Zod Schemas ---
 
 const formIdParamSchema = z.object({
@@ -88,11 +44,9 @@ const testEmailSchema = z.object({
  * This is a placeholder implementation - integrate with your preferred email service
  */
 async function sendEmail(
-  env: Env,
+  _env: Env,
   to: string,
-  subject: string,
-  htmlBody: string,
-  textBody?: string
+  subject: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     // TODO: Integrate with actual email service

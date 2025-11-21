@@ -196,4 +196,62 @@ export interface UpdateNotificationRequest {
   emailTemplateId?: string;
 }
 
+// Webhook types
+export interface Webhook {
+  id: string;
+  formId: string;
+  workspaceId: string;
+  url: string;
+  secret: string;
+  events: string[]; // Array of event types like ["submission.created"]
+  enabled: boolean;
+  retryCount: number;
+  timeoutSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+  createdBy: string;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  formId: string;
+  submissionId?: string;
+  eventType: string;
+  payload: Record<string, any>;
+  status: 'pending' | 'success' | 'failed' | 'retrying';
+  responseStatus?: number;
+  responseBody?: string;
+  errorMessage?: string;
+  attemptCount: number;
+  nextRetryAt?: number;
+  deliveredAt?: number;
+  createdAt: number;
+}
+
+export interface CreateWebhookRequest {
+  url: string;
+  events: string[];
+  enabled?: boolean;
+  retryCount?: number;
+  timeoutSeconds?: number;
+}
+
+export interface UpdateWebhookRequest {
+  url?: string;
+  events?: string[];
+  enabled?: boolean;
+  retryCount?: number;
+  timeoutSeconds?: number;
+}
+
+export interface WebhookEvent {
+  type: string;
+  formId: string;
+  workspaceId: string;
+  submissionId?: string;
+  data: Record<string, any>;
+  timestamp: number;
+}
+
 export type { Env } from './Env';

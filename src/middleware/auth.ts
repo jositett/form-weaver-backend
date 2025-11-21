@@ -48,7 +48,7 @@ export const authMiddleware = createMiddleware<{
     c.set('userRole', payload.role);
 
     await next();
-  } catch (error) {
+  } catch {
     return c.json({
       success: false,
       error: 'Invalid or expired token',
@@ -79,7 +79,7 @@ export const optionalAuthMiddleware = createMiddleware<{
         c.set('workspaceId', payload.workspaceId);
         c.set('userRole', payload.role);
       }
-    } catch (error) {
+    } catch {
       // Silently ignore invalid tokens for optional auth
     }
   }

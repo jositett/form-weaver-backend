@@ -60,7 +60,7 @@ export const verifyToken = async (
       iat: payload.iat,
       exp: payload.exp,
     };
-  } catch (error) {
+  } catch {
     throw new Error('Invalid or expired token');
   }
 };
@@ -134,7 +134,7 @@ export const getRefreshToken = async (
 
     const data = JSON.parse(stored);
     return data.token;
-  } catch (error) {
+  } catch {
     return null;
   }
 };

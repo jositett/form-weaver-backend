@@ -10,6 +10,8 @@ import files from './routes/files';
 import formVersionsRouter from './routes/formVersions';
 import analyticsRouter from './routes/analytics';
 import emailNotificationsRouter from './routes/emailNotifications';
+import webhooksRouter from './routes/webhooks';
+import exportsRouter from './routes/exports';
 import publicForms from './routes/publicForms';
 
 import type { Env } from './types';
@@ -54,6 +56,8 @@ app.route('/api/files', files); // File upload endpoints
 app.route('/api/v1', formVersionsRouter); // Form versioning endpoints
 app.route('/api/forms', analyticsRouter); // Analytics endpoints (mounted under /api/forms/:id/analytics)
 app.route('/api/forms', emailNotificationsRouter); // Email notification endpoints (mounted under /api/forms/:id/notifications)
+app.route('/api/forms', webhooksRouter); // Webhook endpoints (mounted under /api/forms/:id/webhooks)
+app.route('/api/forms', exportsRouter); // Export endpoints (mounted under /api/forms/:id/submissions/export)
 app.route('/api/f', publicForms); // Public form endpoints (mounted under /api/f/:formId)
 
 // 404 handler

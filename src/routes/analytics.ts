@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
 import { checkWorkspaceMembership } from '../utils/workspace';
+import { setCacheHeaders, CACHE_CONFIGS } from '../utils/cache';
 import type { Env, HonoContext } from '../types/index';
 import { getDb } from '../db/db';
 
@@ -186,7 +187,7 @@ analyticsRouter.get(
       // Build query for form views with optional date range
       let viewsQuery;
       if (dateFromSeconds || dateToSeconds) {
-        let conditions = ['form_id = ?'];
+        const conditions = ['form_id = ?'];
         const params = [formId];
 
         if (dateFromSeconds) {
@@ -236,6 +237,9 @@ analyticsRouter.get(
 
       const views = viewsResult.results as { date: string; count: number }[];
       const totalViews = (totalViewsResult.results[0] as { totalViews: number })?.totalViews ?? 0;
+
+      // Set cache headers for analytics data
+      setCacheHeaders(c, CACHE_CONFIGS.ANALYTICS);
 
       return c.json({
         success: true,
@@ -287,6 +291,8 @@ analyticsRouter.get(
       try {
         const cachedAnalytics = await c.env.ANALYTICS_CACHE.get(cacheKey, 'json') as AnalyticsResponse | null;
         if (cachedAnalytics) {
+          // Set cache headers for cached analytics
+          setCacheHeaders(c, CACHE_CONFIGS.ANALYTICS);
           return c.json<AnalyticsResponse>({
             success: true,
             data: cachedAnalytics,
@@ -309,7 +315,7 @@ analyticsRouter.get(
 
       if (dateFromSeconds || dateToSeconds) {
         // Build conditional query for total submissions with date range
-        let conditions = ['form_id = ?'];
+        const conditions = ['form_id = ?'];
         const params = [formId];
 
         if (dateFromSeconds) {
@@ -328,7 +334,7 @@ analyticsRouter.get(
         ).bind(...params.map(p => String(p)));
 
         // 2. Submission Rate with date range filtering
-        let dateConditions = ['form_id = ?'];
+        const dateConditions = ['form_id = ?'];
         const dateParams = [formId];
 
         if (dateFromSeconds) {
@@ -398,7 +404,7 @@ analyticsRouter.get(
       let peakSubmissionTimesQuery;
       if (dateFromSeconds || dateToSeconds) {
         // Build conditional query for peak submission times with date range
-        let conditions = ['form_id = ?'];
+        const conditions = ['form_id = ?'];
         const params = [formId];
 
         if (dateFromSeconds) {
@@ -540,6 +546,9 @@ analyticsRouter.get(
         // Log cache error but don't fail the request
         console.warn('[Analytics Cache Put Error]', cacheError);
       }
+
+      // Set cache headers for fresh analytics data
+      setCacheHeaders(c, CACHE_CONFIGS.ANALYTICS);
 
       return c.json<AnalyticsResponse>({
         success: true,

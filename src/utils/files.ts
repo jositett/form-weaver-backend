@@ -1,5 +1,4 @@
 import type { R2Bucket } from '@cloudflare/workers-types';
-import { File } from '../types';
 
 /**
  * Generates a temporary, signed URL for a file stored in R2.
@@ -12,9 +11,8 @@ import { File } from '../types';
  * @returns A promise that resolves to the file access URL string.
  */
 export async function getSignedFileUrl(
-  r2Bucket: R2Bucket,
-  fileKey: string,
-  originalFileName: string
+  _r2Bucket: R2Bucket,
+  fileKey: string
 ): Promise<string> {
   // For R2, we need to create a proxy URL through our API
   // since R2 doesn't support signed URLs like S3

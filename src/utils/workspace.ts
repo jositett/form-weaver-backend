@@ -1,5 +1,3 @@
-import type { HonoContext } from '../types/index';
-
 /**
  * Check workspace membership helper
  * Extracted from forms.ts to break circular dependency with analytics.ts

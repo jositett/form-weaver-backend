@@ -15,6 +15,7 @@ import {
 import type { Env, HonoContext } from '../types/index';
 import { getDb } from '../db/db';
 import { checkWorkspaceMembership } from '../utils/workspace';
+import { autoCreateVersionOnUpdate } from '../utils/formVersions';
 
 // Generate random ID (simple implementation)
 const generateId = (): string => {
@@ -50,7 +51,7 @@ forms.post(
 
       // Insert form into database
       await getDb(c.env).prepare(`
-        INSERT INTO forms (id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at)
+        INSERT INTO forms (id, workspace_id, title, description, form_schema, status, version, created_by, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
         .bind(
@@ -161,7 +162,7 @@ forms.get(
       const whereClause = conditions.join(' AND ');
 
       const forms = await getDb(c.env).prepare(`
-        SELECT id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at
+        SELECT id, workspace_id, title, description, form_schema, status, version, created_by, created_at, updated_at
         FROM forms
         WHERE ${whereClause} AND deleted_at IS NULL
         ORDER BY ${orderBy} ${orderDirection}
@@ -179,7 +180,7 @@ forms.get(
           workspaceId: row.workspace_id,
           title: row.title,
           description: row.description,
-          schema: JSON.parse(row.schema as string),
+          schema: JSON.parse(row.form_schema as string),
           status: row.status,
           version: row.version,
           createdBy: row.created_by,
@@ -255,7 +256,7 @@ forms.get(
 
       // Fetch from database
       const form = await getDb(c.env).prepare(`
-        SELECT id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at
+        SELECT id, workspace_id, title, description, form_schema, status, version, created_by, created_at, updated_at
         FROM forms
         WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
       `)
@@ -274,7 +275,7 @@ forms.get(
         workspaceId: form.workspace_id,
         title: form.title,
         description: form.description,
-        schema: JSON.parse(form.schema as string),
+        schema: JSON.parse(form.form_schema as string),
         status: form.status,
         version: form.version,
         createdBy: form.created_by,
@@ -525,11 +526,11 @@ forms.put(
       const membershipCheck = await checkWorkspaceMembership(c, workspaceId);
       if (membershipCheck instanceof Response) return membershipCheck;
 
-      const { role } = membershipCheck;
+      const { role, userId } = membershipCheck;
 
       // Get current form data
       const currentForm = await getDb(c.env).prepare(
-        'SELECT title, description, schema, status, version FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
+        'SELECT title, description, form_schema, status, version FROM forms WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL'
       )
         .bind(formId, workspaceId)
         .first();
@@ -540,6 +541,9 @@ forms.put(
           error: 'Form not found or access denied',
         }, 404);
       }
+
+      // Store old schema for version creation
+      const oldSchema = currentForm.form_schema as string;
 
       // Build update query dynamically
       const updateFields: string[] = [];
@@ -557,7 +561,7 @@ forms.put(
       }
 
       if (updateData.schema !== undefined) {
-        updateFields.push('schema = ?');
+        updateFields.push('form_schema = ?');
         updateParams.push(JSON.stringify(updateData.schema));
       }
 
@@ -591,6 +595,22 @@ forms.put(
           success: false,
           error: 'Form not found or no changes made',
         }, 404);
+      }
+
+      // Auto-create version if schema was updated
+      if (updateData.schema !== undefined) {
+        try {
+          await autoCreateVersionOnUpdate(
+            c.env,
+            formId,
+            oldSchema,
+            'schema',
+            userId
+          );
+        } catch (versionError) {
+          console.error('[Auto-create Version Error]', versionError);
+          // Continue with the response even if version creation fails
+        }
       }
 
       // Invalidate cache if status changed
@@ -711,7 +731,7 @@ forms.post(
 
       // Get original form
       const originalForm = await getDb(c.env).prepare(`
-        SELECT title, description, schema, status
+        SELECT title, description, form_schema, status
         FROM forms
         WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
       `)
@@ -731,7 +751,7 @@ forms.post(
       const duplicateTitle = `${originalForm.title} (Copy)`;
 
       await getDb(c.env).prepare(`
-        INSERT INTO forms (id, workspace_id, title, description, schema, status, version, created_by, created_at, updated_at)
+        INSERT INTO forms (id, workspace_id, title, description, form_schema, status, version, created_by, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
         .bind(
@@ -739,7 +759,7 @@ forms.post(
           workspaceId,
           duplicateTitle,
           originalForm.description,
-          originalForm.schema,
+          originalForm.form_schema,
           'draft', // Always create as draft
           1,
           userId,
@@ -755,7 +775,7 @@ forms.post(
           workspaceId,
           title: duplicateTitle,
           description: originalForm.description,
-          schema: JSON.parse(originalForm.schema as string),
+          schema: JSON.parse(originalForm.form_schema as string),
           status: 'draft',
           version: 1,
           createdBy: userId,
@@ -792,7 +812,7 @@ forms.patch(
       const membershipCheck = await checkWorkspaceMembership(c, workspaceId);
       if (membershipCheck instanceof Response) return membershipCheck;
 
-      const { userId, role } = membershipCheck;
+      const { role } = membershipCheck;
 
       // Check permissions for status changes
       if (updateData.status === 'published' && role !== 'owner' && role !== 'admin') {

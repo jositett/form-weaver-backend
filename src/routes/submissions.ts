@@ -100,9 +100,6 @@ submissions.post(
       }
 
       // 3. Validate submission data against form schema
-      const formSchema = JSON.parse(form.schema as string);
-      // TODO: Implement dynamic Zod schema validation based on formSchema
-      // For now, we'll just check if it's an object.
       if (typeof submissionData !== 'object' || submissionData === null) {
         return c.json({
           success: false,
@@ -161,6 +158,18 @@ submissions.post(
       } catch (error) {
         console.error('[Email Notification Error]', error);
         // Don't fail the submission due to email errors
+      }
+
+      // 6. Invalidate analytics cache on new submission
+      try {
+        // Invalidate all analytics cache keys for this form
+        const cacheKeys = [
+          `analytics:${formId}:default:default:true`,
+          `analytics:${formId}:default:default:false`
+        ];
+        await Promise.all(cacheKeys.map(key => c.env.ANALYTICS_CACHE.delete(key)));
+      } catch (cacheError) {
+        console.warn('[Analytics Cache Invalidation Error]', cacheError);
       }
 
       return c.json({
@@ -240,7 +249,7 @@ submissions.get(
         const decodedCursor = atob(query.cursor);
         const cursorValues = decodedCursor.split('|');
         if (cursorValues.length === 2) {
-          const cursorTimestamp = parseInt(cursorValues[0]);
+          const cursorTimestamp = Number.parseInt(cursorValues[0]);
           const cursorId = cursorValues[1];
           conditions.push('(s.submitted_at < ? OR (s.submitted_at = ? AND s.id < ?))');
           params.push(cursorTimestamp, cursorTimestamp, cursorId);
@@ -509,22 +518,112 @@ interface WebhookPayload {
 
 /**
  * Trigger webhooks for a form submission
- * TODO: Implement when webhooks table and delivery system are ready
  */
 async function triggerWebhooks(
   env: Env,
   formId: string,
   payload: WebhookPayload
 ): Promise<void> {
-  console.log(`[Webhook] Would trigger webhooks for form ${formId}`, {
-    submissionId: payload.id,
-    timestamp: new Date(payload.submittedAt).toISOString(),
-  });
+  try {
+    // Get enabled webhooks for this form that listen to submission.created events
+    const webhooks = await getDb(env).prepare(`
+      SELECT id, url, secret, events, retry_count, timeout_seconds
+      FROM webhooks 
+      WHERE form_id = ? AND enabled = 1
+    `).bind(formId).all();
 
-  // TODO: Query webhooks table for configured webhooks
-  // TODO: Send POST requests to webhook URLs with signature
-  // TODO: Implement retry logic and delivery tracking
-  // TODO: For now, this is a no-op placeholder
+    if (webhooks.results.length === 0) {
+      return; // No webhooks configured
+    }
+
+    // Filter webhooks that listen to submission.created events
+    const relevantWebhooks = webhooks.results.filter((webhook: any) => {
+      const events = JSON.parse(webhook.events);
+      return events.includes('submission.created');
+    });
+
+    if (relevantWebhooks.length === 0) {
+      return; // No webhooks listening to submission.created
+    }
+
+    // Create webhook event
+    const webhookEvent = {
+      type: 'submission.created',
+      formId: payload.formId,
+      workspaceId: payload.workspaceId,
+      submissionId: payload.id,
+      data: {
+        submission: {
+          id: payload.id,
+          formId: payload.formId,
+          data: payload.data,
+          submittedAt: payload.submittedAt,
+          ipAddress: payload.ipAddress,
+          userAgent: payload.userAgent,
+          referrer: payload.referrer,
+        },
+      },
+      timestamp: payload.submittedAt,
+    };
+
+    // Queue webhook deliveries
+    const deliveryPromises = relevantWebhooks.map(async (webhook: any) => {
+      const deliveryId = crypto.randomUUID();
+      const now = Date.now();
+
+      // Insert delivery record
+      await getDb(env).prepare(`
+        INSERT INTO webhook_deliveries (
+          id, webhook_id, form_id, submission_id, event_type, payload,
+          status, attempt_count, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?)
+      `).bind(
+        deliveryId,
+        webhook.id,
+        formId,
+        payload.id,
+        'submission.created',
+        JSON.stringify(webhookEvent.data),
+        now
+      ).run();
+
+      // Import and process webhook delivery
+      const { processWebhookDelivery } = await import('../utils/webhooks');
+      
+      // Process delivery asynchronously (don't await to avoid blocking submission)
+      processWebhookDelivery(env, {
+        id: deliveryId,
+        webhookId: webhook.id,
+        formId,
+        submissionId: payload.id,
+        eventType: 'submission.created',
+        payload: webhookEvent.data,
+        status: 'pending',
+        attemptCount: 0,
+        createdAt: now,
+      }, {
+        url: webhook.url,
+        secret: webhook.secret,
+        retryCount: webhook.retry_count,
+        timeoutSeconds: webhook.timeout_seconds,
+      }).catch(error => {
+        console.error('[Webhook Delivery Error]', {
+          webhookId: webhook.id,
+          deliveryId,
+          error: error.message,
+        });
+      });
+    });
+
+    // Don't await all deliveries to avoid blocking the submission response
+    Promise.all(deliveryPromises).catch(error => {
+      console.error('[Webhook Trigger Error]', error);
+    });
+
+  } catch (error) {
+    console.error('[Webhook Trigger Error]', error);
+    // Don't throw - webhook failures shouldn't block submissions
+  }
 }
 
 /**

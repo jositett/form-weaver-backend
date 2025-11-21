@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
-import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
 import { checkRateLimit, getClientIP, createRateLimitHeaders } from '../utils/rateLimit';
+import { setCacheHeaders, CACHE_CONFIGS } from '../utils/cache';
 import type { Env, HonoContext } from '../types/index';
 import { getDb } from '../db/db';
 
@@ -72,7 +71,10 @@ publicForms.get(
         }
       }
 
-      // 3. Return form data
+      // 3. Set cache headers for public forms
+      setCacheHeaders(c, CACHE_CONFIGS.PUBLIC_FORM);
+
+      // 4. Return form data
       return c.json({
         success: true,
         data: {

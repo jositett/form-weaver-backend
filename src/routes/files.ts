@@ -53,7 +53,6 @@ files.post('/:formId/upload', async (c) => {
     }
 
     const file = fileEntry as File;
-    const fieldId = fieldIdEntry;
 
     // Validate file size (max 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
