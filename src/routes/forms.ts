@@ -604,8 +604,7 @@ forms.put(
             c.env,
             formId,
             oldSchema,
-            'schema',
-            userId
+            'schema'
           );
         } catch (versionError) {
           console.error('[Auto-create Version Error]', versionError);

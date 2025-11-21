@@ -548,9 +548,7 @@ emailNotificationsRouter.post(
       const emailResult = await sendEmail(
         c.env,
         recipientEmail,
-        `[TEST] ${emailContent.subject}`,
-        emailContent.htmlBody,
-        emailContent.textBody
+        `[TEST] ${emailContent.subject}`
       );
 
       if (!emailResult.success) {
@@ -717,9 +715,7 @@ export async function sendSubmissionNotification(
       const emailResult = await sendEmail(
         env,
         email,
-        emailContent.subject,
-        emailContent.htmlBody,
-        emailContent.textBody
+        emailContent.subject
       );
 
       // Log notification history

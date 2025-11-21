@@ -95,8 +95,7 @@ export const autoCreateVersionOnUpdate = async (
   env: Env,
   formId: string,
   oldSchema: string,
-  updateType: 'title' | 'description' | 'schema' | 'status',
-  createdBy?: string
+  updateType: 'title' | 'description' | 'schema' | 'status'
 ): Promise<{ versionId: string; versionNumber: number } | null> => {
   // Only create versions for schema changes
   if (updateType !== 'schema') {
@@ -109,7 +108,6 @@ export const autoCreateVersionOnUpdate = async (
     env,
     formId,
     oldSchema,
-    versionNotes,
-    createdBy
+    versionNotes
   );
 };

@@ -389,8 +389,7 @@ submissions.get(
         fileRows.results.map(async (fileRow) => {
           const url = await getSignedFileUrl(
             c.env.FILE_UPLOADS,
-            fileRow.file_name,
-            fileRow.original_name
+            fileRow.file_name
           );
           return {
             id: fileRow.id,
