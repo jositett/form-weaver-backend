@@ -115,7 +115,7 @@ forms.get(
     try {
       // Build WHERE conditions
       const conditions: string[] = ['workspace_id = ?'];
-      const params: any[] = [workspaceId];
+      const params: (string | number)[] = [workspaceId];
 
       if (query.status) {
         conditions.push('status = ?');
@@ -244,7 +244,7 @@ forms.get(
     try {
       // Try cache first for published forms
       const cacheKey = `form:${formId}`;
-      const cachedForm = await c.env.FORM_CACHE.get(cacheKey, 'json') as any;
+      const cachedForm = await c.env.FORM_CACHE.get(cacheKey, 'json') as Record<string, unknown> | null;
 
       if (cachedForm && cachedForm.workspaceId === workspaceId) {
         return c.json({
@@ -349,7 +349,7 @@ forms.get(
 
       // Build WHERE conditions for submissions
       const conditions: string[] = ['s.form_id = ?'];
-      const params: any[] = [formId];
+      const params: (string | number)[] = [formId];
 
       // Date range filtering
       if (query.dateFrom) {
@@ -526,7 +526,7 @@ forms.put(
       const membershipCheck = await checkWorkspaceMembership(c, workspaceId);
       if (membershipCheck instanceof Response) return membershipCheck;
 
-      const { role, userId } = membershipCheck;
+      const { role } = membershipCheck;
 
       // Get current form data
       const currentForm = await getDb(c.env).prepare(
@@ -547,7 +547,7 @@ forms.put(
 
       // Build update query dynamically
       const updateFields: string[] = [];
-      const updateParams: any[] = [];
+      const updateParams: (string | number)[] = [];
       const now = Date.now();
 
       if (updateData.title !== undefined) {

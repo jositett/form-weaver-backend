@@ -30,7 +30,7 @@ export interface WorkspaceMember {
 }
 
 // API response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -66,8 +66,8 @@ export interface FormField {
   type: string;
   label: string;
   required?: boolean;
-  validation?: Record<string, any>;
-  properties?: Record<string, any>;
+  validation?: Record<string, unknown>;
+  properties?: Record<string, unknown>;
 }
 
 export interface Form {
@@ -121,7 +121,7 @@ export interface Submission {
   formId: string;
   formVersionId?: string; // Optional, available after migration
   workspaceId: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   submittedAt: number;
   submittedBy?: string;
   files?: File[]; // Array of associated files with signed URLs
@@ -218,7 +218,7 @@ export interface WebhookDelivery {
   formId: string;
   submissionId?: string;
   eventType: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   status: 'pending' | 'success' | 'failed' | 'retrying';
   responseStatus?: number;
   responseBody?: string;
@@ -250,7 +250,7 @@ export interface WebhookEvent {
   formId: string;
   workspaceId: string;
   submissionId?: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   timestamp: number;
 }
 
