@@ -557,7 +557,7 @@ forms.put(
 
       if (updateData.description !== undefined) {
         updateFields.push('description = ?');
-        updateParams.push(updateData.description);
+        updateParams.push(updateData.description || '');
       }
 
       if (updateData.schema !== undefined) {
@@ -757,7 +757,7 @@ forms.post(
           duplicateId,
           workspaceId,
           duplicateTitle,
-          originalForm.description,
+          originalForm.description || '',
           originalForm.form_schema,
           'draft', // Always create as draft
           1,
