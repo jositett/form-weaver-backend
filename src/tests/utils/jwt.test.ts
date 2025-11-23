@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from '../setup';
+import { describe, it, expect, beforeEach, vi } from '../setup';
 import { generateToken, verifyToken, generateTokens, storeRefreshToken, getRefreshToken, deleteRefreshToken } from '../../utils/jwt';
 
 // Mock environment for KV operations

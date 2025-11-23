@@ -10,12 +10,13 @@ enabled = true
 ENVIRONMENT = "development"
 JWT_EXPIRES_IN = "1h"
 REFRESH_TOKEN_EXPIRES_IN = "30d"
+FROM_EMAIL = "FormWeaver <noreply@formweaver.com>"
 
 # Secrets (set with: wrangler secret put SECRET_NAME)
 # JWT_SECRET
 # STRIPE_SECRET_KEY
 # STRIPE_WEBHOOK_SECRET
-# RESEND_API_KEY (optional - for email notifications)
+# RESEND_API_KEY (required - for email notifications)
 
 # D1 Database
 [[d1_databases]]

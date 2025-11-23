@@ -7,10 +7,10 @@ import type { HonoContext } from '../types/index';
  * Extracts and verifies JWT token from Authorization header
  * Sets user context variables on the request
  */
+import type { Env } from '../types/Env';
+
 export const authMiddleware = createMiddleware<{
-  Bindings: {
-    JWT_SECRET: string;
-  };
+  Bindings: Env;
   Variables: HonoContext;
 }>(async (c, next) => {
   const authHeader = c.req.header('Authorization');
@@ -61,9 +61,7 @@ export const authMiddleware = createMiddleware<{
  * Does not return error on missing token, just continues without user context
  */
 export const optionalAuthMiddleware = createMiddleware<{
-  Bindings: {
-    JWT_SECRET: string;
-  };
+  Bindings: Env;
   Variables: HonoContext;
 }>(async (c, next) => {
   const authHeader = c.req.header('Authorization');
@@ -86,3 +84,79 @@ export const optionalAuthMiddleware = createMiddleware<{
 
   await next();
 });
+
+/**
+ * Workspace authorization middleware
+ * Verifies workspace access and role permissions
+ */
+export const workspaceAuthMiddleware = (requiredRoles: string[] = []) =>
+  createMiddleware<{
+    Bindings: Env;
+    Variables: HonoContext;
+  }>(async (c, next) => {
+    const authHeader = c.req.header('Authorization');
+
+    if (!authHeader) {
+      return c.json({
+        success: false,
+        error: 'Missing authorization header',
+      }, 401);
+    }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      return c.json({
+        success: false,
+        error: 'Invalid authorization header format',
+      }, 401);
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+      const payload = await verifyToken(token, c.env.JWT_SECRET);
+
+      if (payload.type !== 'access') {
+        return c.json({
+          success: false,
+          error: 'Invalid token type',
+        }, 401);
+      }
+
+      // Set user context
+      c.set('userId', payload.sub);
+      c.set('workspaceId', payload.workspaceId);
+      c.set('userRole', payload.role);
+
+      // Check workspace membership
+      const workspaceId = payload.workspaceId;
+      const userId = payload.sub;
+
+      const member = await c.env.DB.prepare(
+        'SELECT role FROM workspace_members WHERE user_id = ? AND workspace_id = ?'
+      )
+        .bind(userId, workspaceId)
+        .first() as { role: string } | null;
+
+      if (!member) {
+        return c.json({
+          success: false,
+          error: 'Access denied: not a member of this workspace',
+        }, 403);
+      }
+
+      // Check role permissions if required
+      if (requiredRoles.length > 0 && !requiredRoles.includes(member.role)) {
+        return c.json({
+          success: false,
+          error: `Insufficient permissions. Required: ${requiredRoles.join(', ')}, Current: ${member.role}`,
+        }, 403);
+      }
+
+      await next();
+    } catch {
+      return c.json({
+        success: false,
+        error: 'Invalid or expired token',
+      }, 401);
+    }
+  });

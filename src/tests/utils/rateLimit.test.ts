@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest';
 import {
   checkRateLimit,
   getClientIP,
@@ -14,17 +14,19 @@ import {
  * and header generation with comprehensive edge case coverage.
  */
 describe('Rate Limiting Utilities', () => {
-  let mockKV: KVNamespace;
+  // Declare mockKV as a record of mocked functions to allow .mockResolvedValue etc.
+  let mockKV: Record<string, MockedFunction<any>>;
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
-    // Create mock KV namespace
+    // Create mock KV namespace with all methods mocked, using `any` for complex overloads
     mockKV = {
       get: vi.fn(),
       put: vi.fn(),
       delete: vi.fn(),
       list: vi.fn(),
-    } as unknown as KVNamespace;
+      getWithMetadata: vi.fn(),
+    };
 
     // Store original environment
     originalEnv = { ...process.env };
@@ -119,9 +121,9 @@ describe('Rate Limiting Utilities', () => {
 
     it('should allow first request within rate limit', async () => {
       // Mock KV to return no existing count
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
+      mockKV.get.mockResolvedValue(null);
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       expect(result).toEqual({
         allowed: true,
@@ -138,9 +140,9 @@ describe('Rate Limiting Utilities', () => {
 
     it('should allow requests within the rate limit window', async () => {
       // Mock existing count of 2
-      (mockKV.get as jest.Mock).mockResolvedValue('2');
+      mockKV.get.mockResolvedValue('2');
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       expect(result).toEqual({
         allowed: true,
@@ -157,9 +159,9 @@ describe('Rate Limiting Utilities', () => {
 
     it('should deny request when rate limit is exceeded', async () => {
       // Mock existing count at limit
-      (mockKV.get as jest.Mock).mockResolvedValue('5');
+      mockKV.get.mockResolvedValue('5');
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       expect(result).toEqual({
         allowed: false,
@@ -174,9 +176,9 @@ describe('Rate Limiting Utilities', () => {
 
     it('should handle partial count correctly at rate limit boundary', async () => {
       // Mock existing count just below limit
-      (mockKV.get as jest.Mock).mockResolvedValue('4');
+      mockKV.get.mockResolvedValue('4');
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       expect(result).toEqual({
         allowed: true,
@@ -192,9 +194,9 @@ describe('Rate Limiting Utilities', () => {
     });
 
     it('should use default configuration when none provided', async () => {
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
+      mockKV.get.mockResolvedValue(null);
 
-      const result = await checkRateLimit(mockKV, testIP);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP);
 
       expect(result).toEqual({
         allowed: true,
@@ -210,9 +212,9 @@ describe('Rate Limiting Utilities', () => {
     });
 
     it('should handle invalid count from KV gracefully', async () => {
-      (mockKV.get as jest.Mock).mockResolvedValue('invalid-number');
+      mockKV.get.mockResolvedValue('invalid-number');
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       // parseInt('invalid-number', 10) returns NaN
       // In the rate limit function: remaining = Math.max(0, config.maxRequests - count - 1)
@@ -223,9 +225,9 @@ describe('Rate Limiting Utilities', () => {
     });
 
     it('should handle KV storage failure gracefully by allowing request', async () => {
-      (mockKV.get as jest.Mock).mockRejectedValue(new Error('KV connection failed'));
+      mockKV.get.mockRejectedValue(new Error('KV connection failed'));
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       // Should allow request when KV fails
       expect(result).toEqual({
@@ -239,11 +241,11 @@ describe('Rate Limiting Utilities', () => {
     });
 
     it('should handle KV put failure gracefully after successful get', async () => {
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
-      (mockKV.put as jest.Mock).mockRejectedValue(new Error('KV write failed'));
+      mockKV.get.mockResolvedValue(null);
+      mockKV.put.mockRejectedValue(new Error('KV write failed'));
 
       // Should still return success even if put fails
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(4);
@@ -253,9 +255,9 @@ describe('Rate Limiting Utilities', () => {
       // Mock current time to be 30 seconds into a 60-second window
       vi.spyOn(Date, 'now').mockReturnValue(1640995230000); // 30 seconds later
 
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
+      mockKV.get.mockResolvedValue(null);
 
-      await checkRateLimit(mockKV, testIP, customConfig);
+      await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       // TTL should be 30 seconds (60 - 30)
       expect(mockKV.put).toHaveBeenCalledWith(
@@ -353,9 +355,9 @@ describe('Rate Limiting Utilities', () => {
     });
 
     it('should create proper composite keys with timestamp', async () => {
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
+      mockKV.get.mockResolvedValue(null);
 
-      await checkRateLimit(mockKV, 'test-ip', customConfig);
+      await checkRateLimit(mockKV as KVNamespace, 'test-ip', customConfig);
 
       expect(mockKV.put).toHaveBeenCalledWith(
         'ratelimit:test-ip:1640995200000', // Composite key format
@@ -370,9 +372,9 @@ describe('Rate Limiting Utilities', () => {
         maxRequests: 2,
       };
 
-      (mockKV.get as jest.Mock).mockResolvedValue('1');
+      mockKV.get.mockResolvedValue('1');
 
-      const result = await checkRateLimit(mockKV, testIP, microConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, microConfig);
 
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(0);
@@ -385,9 +387,9 @@ describe('Rate Limiting Utilities', () => {
         maxRequests: 1000,
       };
 
-      (mockKV.get as jest.Mock).mockResolvedValue('500');
+      mockKV.get.mockResolvedValue('500');
 
-      const result = await checkRateLimit(mockKV, testIP, macroConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, macroConfig);
 
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(499);
@@ -400,9 +402,9 @@ describe('Rate Limiting Utilities', () => {
         maxRequests: 0,
       };
 
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
+      mockKV.get.mockResolvedValue(null);
 
-      const result = await checkRateLimit(mockKV, testIP, zeroConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, zeroConfig);
 
       expect(result).toEqual({
         allowed: false,
@@ -416,9 +418,9 @@ describe('Rate Limiting Utilities', () => {
       // Mock time to be exactly at window boundary
       vi.spyOn(Date, 'now').mockReturnValue(1640995260000); // At window end
 
-      (mockKV.get as jest.Mock).mockResolvedValue(null);
+      mockKV.get.mockResolvedValue(null);
 
-      const result = await checkRateLimit(mockKV, testIP, customConfig);
+      const result = await checkRateLimit(mockKV as KVNamespace, testIP, customConfig);
 
       // Should still allow the request with TTL of 1 second minimum
       expect(result.allowed).toBe(true);

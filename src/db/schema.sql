@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   name TEXT,
+  avatar_url TEXT, -- URL to user's avatar image
+  bio TEXT, -- User biography
+  location TEXT, -- User location
+  website TEXT, -- User website URL
   email_verified INTEGER DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
@@ -108,3 +112,31 @@ CREATE TABLE IF NOT EXISTS submission_files (
 
 CREATE INDEX IF NOT EXISTS idx_submission_files_submission ON submission_files(submission_id);
 CREATE INDEX IF NOT EXISTS idx_submission_files_file ON submission_files(file_id);
+
+-- User preferences table
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  preferences TEXT NOT NULL, -- JSON string containing user preferences
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(user_id);
+
+-- User audit log table
+CREATE TABLE IF NOT EXISTS user_audit_log (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  action TEXT NOT NULL, -- Type of action (profile_updated, email_changed, etc.)
+  details TEXT NOT NULL, -- JSON string containing action details
+  ip_address TEXT, -- IP address of the action
+  user_agent TEXT, -- User agent string
+  timestamp INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_audit_log_user ON user_audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_audit_log_timestamp ON user_audit_log(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_user_audit_log_action ON user_audit_log(action);

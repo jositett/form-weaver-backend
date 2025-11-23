@@ -24,6 +24,69 @@ export const FORM_SUBMISSION_RATE_LIMIT: RateLimitConfig = {
 };
 
 /**
+ * Rate limit configuration for email operations
+ * 5 email operations per hour per IP to prevent abuse
+ */
+export const EMAIL_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 5,
+};
+
+/**
+ * Rate limit configuration for password reset requests
+ * 3 password reset attempts per hour per IP
+ */
+export const PASSWORD_RESET_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 3,
+};
+
+/**
+ * Rate limit configuration for signup requests
+ * 3 signup attempts per hour per IP
+ */
+export const SIGNUP_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 3,
+};
+
+/**
+ * Rate limit configuration for profile updates
+ * 10 profile updates per hour per user
+ */
+export const PROFILE_UPDATE_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 10,
+};
+
+/**
+ * Rate limit configuration for email changes
+ * 3 email changes per 24 hours per user
+ */
+export const EMAIL_CHANGE_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  maxRequests: 3,
+};
+
+/**
+ * Rate limit configuration for password changes
+ * 5 password changes per hour per user
+ */
+export const PASSWORD_CHANGE_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 5,
+};
+
+/**
+ * Rate limit configuration for account deletions
+ * 1 account deletion per 7 days per user
+ */
+export const ACCOUNT_DELETION_RATE_LIMIT: RateLimitConfig = {
+  windowMs: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxRequests: 1,
+};
+
+/**
  * Check rate limit for a given key using KV storage
  * @param kv - KV namespace for rate limiting
  * @param key - Rate limit key (e.g., IP address)

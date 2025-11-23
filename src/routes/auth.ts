@@ -15,6 +15,13 @@ import {
   ResetPasswordInput,
   ResetPasswordConfirmInput
 } from '../utils/validation';
+import { sendEmailVerification, sendPasswordResetEmail } from '../services/emailService';
+import {
+  checkRateLimit,
+  getClientIP,
+  SIGNUP_RATE_LIMIT,
+  PASSWORD_RESET_RATE_LIMIT
+} from '../utils/rateLimit';
 import type { Env, HonoContext } from '../types/index';
 import { getDb } from '../db/db';
 
@@ -40,6 +47,21 @@ auth.post(
     const { email, password, name }: SignupInput = c.req.valid('json');
 
     try {
+      // Check signup rate limit
+      const clientIP = getClientIP(c.req.raw);
+      const signupRateLimit = await checkRateLimit(
+        c.env.RATE_LIMIT,
+        `signup:${clientIP}`,
+        SIGNUP_RATE_LIMIT
+      );
+
+      if (!signupRateLimit.allowed) {
+        return c.json({
+          success: false,
+          error: 'Too many signup attempts. Please try again later.',
+          retryAfter: signupRateLimit.retryAfter,
+        }, 429);
+      }
       // Check if user already exists
       const existingUser = await getDb(c.env).prepare(
         'SELECT id FROM users WHERE email = ?'
@@ -107,6 +129,28 @@ auth.post(
       // Store refresh token in KV
       await storeRefreshToken(c.env, userId, tokens.refreshToken);
 
+      // Generate email verification token and send verification email
+      const verificationToken = crypto.randomUUID();
+      await c.env.EMAIL_TOKENS.put(
+        `verify:${verificationToken}`,
+        JSON.stringify({
+          userId,
+          email: email.toLowerCase(),
+          createdAt: now,
+        }),
+        {
+          expirationTtl: 24 * 60 * 60, // 24 hours
+        }
+      );
+
+      // Send verification email
+      const emailSent = await sendEmailVerification(
+        c.env,
+        email.toLowerCase(),
+        verificationToken,
+        name
+      );
+
       // Return success response
       return c.json({
         success: true,
@@ -131,7 +175,9 @@ auth.post(
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
         },
-        message: 'Account created successfully',
+        message: emailSent
+          ? 'Account created successfully. Please check your email to verify your account.'
+          : 'Account created successfully. Email verification could not be sent at this time.',
       }, 201);
 
     } catch (error) {
@@ -320,9 +366,25 @@ auth.post(
       if ('email' in body) {
         const { email }: ResetPasswordInput = body;
 
+        // Check password reset rate limit
+        const clientIP = getClientIP(c.req.raw);
+        const resetRateLimit = await checkRateLimit(
+          c.env.RATE_LIMIT,
+          `password-reset:${clientIP}`,
+          PASSWORD_RESET_RATE_LIMIT
+        );
+
+        if (!resetRateLimit.allowed) {
+          return c.json({
+            success: false,
+            error: 'Too many password reset attempts. Please try again later.',
+            retryAfter: resetRateLimit.retryAfter,
+          }, 429);
+        }
+
         // Find user by email
         const user = await getDb(c.env).prepare(
-          'SELECT id, email FROM users WHERE email = ?'
+          'SELECT id, email, name FROM users WHERE email = ?'
         )
           .bind(email.toLowerCase())
           .first();
@@ -351,13 +413,19 @@ auth.post(
           }
         );
 
-        // TODO: Send email with reset link
-        // For now, return the token for testing
-        console.log(`Password reset token for ${user.email}: ${resetToken}`);
+        // Send password reset email
+        const emailSent = await sendPasswordResetEmail(
+          c.env,
+          user.email as string,
+          resetToken,
+          user.name as string
+        );
 
         return c.json({
           success: true,
-          message: 'If the email exists, a password reset link has been sent',
+          message: emailSent
+            ? 'If the email exists, a password reset link has been sent.'
+            : 'Password reset could not be processed at this time. Please try again later.',
         });
       }
       // Handle password reset confirmation
@@ -389,7 +457,7 @@ auth.post(
         await c.env.EMAIL_TOKENS.delete(`reset:${token}`);
 
         // Invalidate all refresh tokens for security
-        await deleteRefreshToken(c.env, userId);
+        await deleteRefreshToken(c.env, userId as string);
 
         return c.json({
           success: true,

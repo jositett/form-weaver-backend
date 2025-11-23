@@ -90,7 +90,7 @@ export const createFormSchema = z.object({
 
 export const listFormsQuerySchema = z.object({
   cursor: z.string().optional(),
-  limit: z.string().transform(val =>  Math.min(parseInt(val || '50'), 100)).optional(),
+  limit: z.string().transform(val =>  Math.min(Number.parseInt(val || '50'), 100)).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   search: z.string().optional(),
   sortBy: z.enum(['created_at', 'updated_at', 'title']).optional().default('created_at'),
@@ -119,6 +119,45 @@ export const listFormVersionsQuerySchema = z.object({
 
 export type ListFormVersionsQuery = z.infer<typeof listFormVersionsQuerySchema>;
 
+// Workspace validation schemas
+export const createWorkspaceSchema = z.object({
+  name: z.string().min(1, 'Workspace name is required').max(100, 'Workspace name must be less than 100 characters'),
+  slug: z.string().regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens').optional(),
+});
+
+export const updateWorkspaceSchema = z.object({
+  name: z.string().min(1, 'Workspace name is required').max(100, 'Workspace name must be less than 100 characters').optional(),
+  slug: z.string().regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens').optional(),
+});
+
+export const workspaceMemberSchema = z.object({
+  userId: z.string().uuid('Invalid user ID format'),
+  role: z.enum(['admin', 'editor', 'viewer'], {
+    errorMap: () => ({ message: 'Role must be admin, editor, or viewer' })
+  }),
+});
+
+export const workspaceInviteSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  role: z.enum(['admin', 'editor', 'viewer'], {
+    errorMap: () => ({ message: 'Role must be admin, editor, or viewer' })
+  }),
+});
+
+export const workspaceSwitchSchema = z.object({
+  workspaceId: z.string().uuid('Invalid workspace ID format'),
+});
+
+export const listWorkspacesQuerySchema = z.object({
+  limit: z.string().transform(val => Math.min(Number.parseInt(val || '50'), 100)).optional(),
+  cursor: z.string().optional(),
+  includeMembers: z.string().transform(val => val === 'true').optional(),
+});
+
+export const workspaceIdParamSchema = z.object({
+  id: z.string().uuid('Invalid workspace ID format'),
+});
+
 // Type exports
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -130,3 +169,11 @@ export type CreateFormInput = z.infer<typeof createFormSchema>;
 export type UpdateFormInput = z.infer<typeof updateFormSchema>;
 export type UpdateFormStatusInput = z.infer<typeof updateFormStatusSchema>;
 export type ListFormsQuery = z.infer<typeof listFormsQuerySchema>;
+export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
+export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
+export type WorkspaceMemberInput = z.infer<typeof workspaceMemberSchema>;
+export type WorkspaceInviteInput = z.infer<typeof workspaceInviteSchema>;
+export type WorkspaceSwitchInput = z.infer<typeof workspaceSwitchSchema>;
+export type ListWorkspacesQuery = z.infer<typeof listWorkspacesQuerySchema>;
+export type WorkspaceIdParam = z.infer<typeof workspaceIdParamSchema>;
+

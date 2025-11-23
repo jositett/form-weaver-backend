@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { TTLManager } from '../utils/cacheTTL';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { authMiddleware } from '../middleware/auth';
@@ -242,7 +243,7 @@ forms.get(
     if (membershipCheck instanceof Response) return membershipCheck;
 
     try {
-      // Try cache first for published forms
+      // Try cache first
       const cacheKey = `form:${formId}`;
       const cachedForm = await c.env.FORM_CACHE.get(cacheKey, 'json') as Record<string, unknown> | null;
 
@@ -256,7 +257,7 @@ forms.get(
 
       // Fetch from database
       const form = await getDb(c.env).prepare(`
-        SELECT id, workspace_id, title, description, form_schema, status, version, created_by, created_at, updated_at
+        SELECT id, workspace_id, title, description, form_schema, status, version, created_by, created_at, updated_at, view_count
         FROM forms
         WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
       `)
@@ -281,14 +282,21 @@ forms.get(
         createdBy: form.created_by,
         createdAt: form.created_at,
         updatedAt: form.updated_at,
+        viewCount: form.view_count || 0,
       };
 
-      // Cache published forms for 10 minutes
-      if (form.status === 'published') {
-        await c.env.FORM_CACHE.put(cacheKey, JSON.stringify(formData), {
-          expirationTtl: 600, // 10 minutes
-        });
-      }
+      // Calculate dynamic TTL based on form status and usage
+      const ttl = TTLManager.getFormTTL({
+        status: form.status,
+        viewCount: form.view_count,
+        lastUpdated: form.updated_at,
+        isPopular: (form.view_count || 0) > 1000
+      });
+
+      // Cache all forms with dynamic TTL
+      await c.env.FORM_CACHE.put(cacheKey, JSON.stringify(formData), {
+        expirationTtl: ttl
+      });
 
       return c.json({
         success: true,

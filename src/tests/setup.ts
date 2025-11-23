@@ -14,6 +14,12 @@ export interface TestEnv {
   WEBHOOK_SECRET?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   R2_BUCKET?: R2Bucket;
+  EMAIL_TOKENS?: KVNamespace;
+  RATE_LIMIT?: KVNamespace;
+  FORM_CACHE?: KVNamespace;
+  ANALYTICS_CACHE?: KVNamespace;
+  RESEND_API_KEY?: string;
+  FROM_EMAIL?: string;
 }
 
 // Create a Miniflare instance for testing
@@ -25,6 +31,30 @@ export async function createMiniflareTestEnv(overrides: Partial<TestEnv> = {}): 
   const defaultEnv: TestEnv = {
     JWT_SECRET: 'test-jwt-secret-key-for-testing-only',
     SESSION_STORE: {
+      put: vi.fn(),
+      get: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    } as unknown as KVNamespace,
+    EMAIL_TOKENS: {
+      put: vi.fn(),
+      get: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    } as unknown as KVNamespace,
+    RATE_LIMIT: {
+      put: vi.fn(),
+      get: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    } as unknown as KVNamespace,
+    FORM_CACHE: {
+      put: vi.fn(),
+      get: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    } as unknown as KVNamespace,
+    ANALYTICS_CACHE: {
       put: vi.fn(),
       get: vi.fn(),
       delete: vi.fn(),
@@ -49,23 +79,50 @@ export async function createMiniflareTestEnv(overrides: Partial<TestEnv> = {}): 
       head: vi.fn(),
       list: vi.fn(),
     } as unknown as R2Bucket,
+    RESEND_API_KEY: 'test-resend-api-key',
+    FROM_EMAIL: 'noreply@test.com',
   };
 
   const env = { ...defaultEnv, ...overrides };
+
+  // Filter out non-JSON-serializable bindings for Miniflare's `bindings` property
+  const mfBindings: Record<string, string | number | boolean | undefined> = {};
+  for (const key in env) {
+    if (
+      typeof env[key as keyof TestEnv] === 'string' ||
+      typeof env[key as keyof TestEnv] === 'number' ||
+      typeof env[key as keyof TestEnv] === 'boolean'
+    ) {
+      mfBindings[key] = env[key as keyof TestEnv] as string | number | boolean | undefined;
+    }
+  }
 
   const mf = new Miniflare({
     script: `
       import app from './src/index.ts';
       export default app;
     `,
-    bindings: env,
-    kvNamespaces: ['SESSION_STORE'],
-    d1Databases: ['DB'],
-    r2Buckets: ['R2_BUCKET'],
-    compatibilityFlags: ['nodejs_compat'],
-  });
+    bindings: {
+      ...mfBindings,
+      JWT_SECRET: env.JWT_SECRET,
+      ENVIRONMENT: env.ENVIRONMENT,
+      ...(env.SMTP_HOST && { SMTP_HOST: env.SMTP_HOST }),
+      ...(env.SMTP_PORT && { SMTP_PORT: env.SMTP_PORT }),
+      ...(env.SMTP_USER && { SMTP_USER: env.SMTP_USER }),
+      ...(env.SMTP_PASS && { SMTP_PASS: env.SMTP_PASS }),
+      ...(env.WEBHOOK_SECRET && { WEBHOOK_SECRET: env.WEBHOOK_SECRET }),
+      ...(env.CLOUDFLARE_ACCOUNT_ID && { CLOUDFLARE_ACCOUNT_ID: env.CLOUDFLARE_ACCOUNT_ID }),
+      RESEND_API_KEY: 'test-resend-api-key', // Add missing RESEND_API_KEY
+      FROM_EMAIL: 'noreply@test.com', // Add missing FROM_EMAIL
+   } as Record<string, string | number | boolean>, // Cast to a type compatible with Json
+   kvNamespaces: ['SESSION_STORE', 'EMAIL_TOKENS', 'RATE_LIMIT', 'FORM_CACHE', 'ANALYTICS_CACHE'],
+   d1Databases: ['DB'],
+   r2Buckets: ['R2_BUCKET'],
+   compatibilityFlags: ['nodejs_compat'],
+   logLevel: 2, // INFO level
+ });
 
-  return { mf, env };
+ return { mf, env };
 }
 
 // Mock database helpers

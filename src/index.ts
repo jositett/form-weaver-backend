@@ -13,6 +13,8 @@ import emailNotificationsRouter from './routes/emailNotifications';
 import webhooksRouter from './routes/webhooks';
 import exportsRouter from './routes/exports';
 import publicForms from './routes/publicForms';
+import workspaces from './routes/workspaces';
+import users from './routes/users';
 
 import type { Env } from './types';
 
@@ -50,6 +52,8 @@ app.get('/api/health', (c) => {
 
 // Mount routes
 app.route('/api/auth', auth);
+app.route('/api/workspaces', workspaces); // Workspace management endpoints
+app.route('/api/users', users); // User profile management endpoints
 app.route('/api/forms', forms);
 app.route('/api/submissions', submissions); // Submission management endpoints
 app.route('/api/files', files); // File upload endpoints
