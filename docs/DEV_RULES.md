@@ -894,7 +894,7 @@ curl -X GET "https://api.formweaver.com/api/marketplace/health"
 
 For comprehensive development guidelines, also refer to:
 - [Backend README](./README.md)
-- [Backend API Documentation](./BACKEND.md)
+- [Backend API Documentation](./API.md)
 - [Backend Checklist](./BACKEND_CHECKLIST.md)
 - [Implementation Guide](./IMPLEMENTATION_GUIDE.md)
 - [Quality Assurance](./QUALITY_ASSURANCE.md)

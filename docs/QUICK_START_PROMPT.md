@@ -226,7 +226,7 @@ After completing the sprint, run git commands to sync the main repository.
 ### **Marketplace Backend Documentation**
 
 - **docs/POST_MVP_GUIDE.md** - Complete marketplace strategy and legal compliance framework
-- **docs/BACKEND.md** - Backend architecture and API documentation
+- **backend/docs/API.md** - Backend architecture and API documentation
 - **docs/QUALITY_ASSURANCE.md** - Backend quality standards and testing procedures
 - **docs/CACHE_STRATEGY.md** - Backend caching strategies and KV optimization plans
 
@@ -241,8 +241,8 @@ After completing the sprint, run git commands to sync the main repository.
 
 - **docs/HOW_TO_CONTINUE_WORK.md** - Detailed backend sprint-based development instructions
 - **docs/SPRINT_SUMMARY_2025-11-22.md** - Recent backend sprint accomplishments and learnings
-- **backend/WORKERS-KV-DOCS.md** - KV storage documentation
-- **backend/KV_CACHE_OPTIMIZATION_PLAN.md** - Backend caching optimization plans
+- **backend/docs/CACHE_OPTIMIZATION.md** - KV storage documentation
+- **backend/docs/KV_CACHE_OPTIMIZATION_PLAN.md** - Backend caching optimization plans
 
 **Note:** For marketplace backend development, prioritize reading POST_MVP_GUIDE.md first to understand the comprehensive strategy before diving into implementation checklists.
 

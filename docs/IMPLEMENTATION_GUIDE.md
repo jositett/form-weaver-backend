@@ -1935,7 +1935,7 @@ All backend implementation should follow these patterns and be thoroughly tested
 
 For comprehensive backend development, also refer to:
 - [Backend README](./README.md)
-- [Backend API Documentation](./BACKEND.md)
+- [Backend API Documentation](./API.md)
 - [Backend Checklist](./BACKEND_CHECKLIST.md)
 - [Development Rules](./DEV_RULES.md)
 - [Quality Assurance](./QUALITY_ASSURANCE.md)

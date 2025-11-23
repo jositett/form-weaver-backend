@@ -1910,7 +1910,7 @@ wrangler d1:execute --file rollback.sql
 
 For comprehensive backend post-MVP guidance, also refer to:
 - [Backend README](./README.md)
-- [Backend API Documentation](./BACKEND.md)
+- [Backend API Documentation](./API.md)
 - [Backend Checklist](./BACKEND_CHECKLIST.md)
 - [Development Rules](./DEV_RULES.md)
 - [Implementation Guide](./IMPLEMENTATION_GUIDE.md)

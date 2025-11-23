@@ -2401,7 +2401,7 @@ All backend testing should be automated where possible and integrated into the C
 
 For comprehensive backend quality assurance, also refer to:
 - [Backend README](./README.md)
-- [Backend API Documentation](./BACKEND.md)
+- [Backend API Documentation](./API.md)
 - [Backend Checklist](./BACKEND_CHECKLIST.md)
 - [Development Rules](./DEV_RULES.md)
 - [Implementation Guide](./IMPLEMENTATION_GUIDE.md)

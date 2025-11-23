@@ -1,6 +1,7 @@
 # Backend API Documentation - Marketplace Edition
 
 This backend is built with:
+
 - **Cloudflare Workers**: Serverless edge compute
 - **Hono**: Lightweight, fast web framework
 - **D1**: SQLite database at the edge
@@ -54,7 +55,7 @@ backend/
 
 ## Development
 
-### Start local development server:
+### Start local development server
 
 ```bash
 cd backend
@@ -63,14 +64,14 @@ npm run dev
 
 The API will be available at: `http://localhost:8787`
 
-### Initialize D1 database:
+### Initialize D1 database
 
 ```bash
 npm run d1:create
 npm run d1:migrate
 ```
 
-### Check database:
+### Check database
 
 ```bash
 npm run d1:query "SELECT * FROM users LIMIT 5"
@@ -118,6 +119,7 @@ GET /api/marketplace/templates
 ```
 
 **Query Parameters:**
+
 - `category` (optional): Filter by category (business, healthcare, education, etc.)
 - `complexity` (optional): Filter by complexity (basic, standard, premium, enterprise)
 - `price_min` (optional): Minimum price filter
@@ -129,6 +131,7 @@ GET /api/marketplace/templates
 - `offset` (optional): Pagination offset (default: 0)
 
 **Response:**
+
 ```json
 {
   "templates": [
@@ -168,6 +171,7 @@ GET /api/marketplace/templates/:id
 ```
 
 **Response:**
+
 ```json
 {
   "id": "tmpl_123",
@@ -237,6 +241,7 @@ POST /api/marketplace/templates/:id/purchase
 ```
 
 **Request:**
+
 ```json
 {
   "use_case": "private_practice", // or "hospital", "clinic", etc.
@@ -245,6 +250,7 @@ POST /api/marketplace/templates/:id/purchase
 ```
 
 **Response:**
+
 ```json
 {
   "purchase_id": "purchase_123",
@@ -275,6 +281,7 @@ GET /api/marketplace/categories
 ```
 
 **Response:**
+
 ```json
 {
   "categories": [
@@ -303,10 +310,12 @@ GET /api/marketplace/search
 ```
 
 **Query Parameters:**
+
 - `q`: Search query
 - `filters`: JSON string of additional filters
 
 **Response:**
+
 ```json
 {
   "results": [/* template objects */],
@@ -329,6 +338,7 @@ POST /api/creators/onboard
 ```
 
 **Request:**
+
 ```json
 {
   "professional_name": "Medical Forms Pro",
@@ -342,6 +352,7 @@ POST /api/creators/onboard
 ```
 
 **Response:**
+
 ```json
 {
   "creator_id": "user_456",
@@ -365,6 +376,7 @@ GET /api/creators/:id/dashboard
 ```
 
 **Response:**
+
 ```json
 {
   "creator": {
@@ -416,6 +428,7 @@ POST /api/creators/:id/templates
 ```
 
 **Request:**
+
 ```json
 {
   "name": "Dental Patient Intake",
@@ -443,11 +456,13 @@ GET /api/creators/:id/analytics
 ```
 
 **Query Parameters:**
+
 - `start_date` (optional): Start date for analytics
 - `end_date` (optional): End date for analytics
 - `template_id` (optional): Specific template analytics
 
 **Response:**
+
 ```json
 {
   "period": {
@@ -492,6 +507,7 @@ GET /api/commissions/:id
 ```
 
 **Response:**
+
 ```json
 {
   "commission_id": "comm_123",
@@ -554,10 +570,12 @@ GET /api/payouts/:id
 ```
 
 **Query Parameters:**
+
 - `limit` (optional): Number of payouts to return (default: 10)
 - `status` (optional): Filter by status (pending, paid, failed, cancelled)
 
 **Response:**
+
 ```json
 {
   "payouts": [
@@ -587,6 +605,7 @@ POST /api/payouts/request
 ```
 
 **Request:**
+
 ```json
 {
   "amount": 1500.00,
@@ -596,6 +615,7 @@ POST /api/payouts/request
 ```
 
 **Response:**
+
 ```json
 {
   "request_id": "req_123",
@@ -617,6 +637,7 @@ POST /api/compliance/retention
 ```
 
 **Request:**
+
 ```json
 {
   "form_id": "form_123",
@@ -637,10 +658,12 @@ GET /api/compliance/deletions
 ```
 
 **Query Parameters:**
+
 - `status` (optional): upcoming, overdue, completed
 - `days_ahead` (optional): How many days ahead to look (default: 7)
 
 **Response:**
+
 ```json
 {
   "scheduled_deletions": [
@@ -671,6 +694,7 @@ POST /api/compliance/export
 ```
 
 **Request:**
+
 ```json
 {
   "user_id": "user_123",
@@ -681,6 +705,7 @@ POST /api/compliance/export
 ```
 
 **Response:**
+
 ```json
 {
   "export_id": "exp_123",
@@ -868,24 +893,28 @@ const errorHandler = async (c, next) => {
 ## Security Considerations
 
 ### Authentication & Authorization
+
 - All marketplace endpoints require JWT authentication
 - Creator endpoints require active Pro subscription
 - Template purchases require valid payment method
 - Admin endpoints require elevated permissions
 
 ### Data Protection
+
 - All template data encrypted at rest using Cloudflare KV
 - Sensitive form submissions use separate encrypted storage
 - PCI compliance for payment processing via Stripe
 - HIPAA compliance for medical forms (encrypted storage, access logs)
 
 ### Rate Limiting
+
 - Marketplace browsing: 100 requests/minute per IP
 - Template purchases: 10 requests/minute per user
 - Creator actions: 60 requests/minute per creator
 - Compliance operations: 30 requests/minute per admin
 
 ### Input Validation
+
 - All form schemas validated against JSON Schema
 - File uploads scanned for malware
 - Template content sanitized for XSS prevention
@@ -894,18 +923,21 @@ const errorHandler = async (c, next) => {
 ## Performance Optimization
 
 ### Caching Strategy
+
 - Template listings cached for 5 minutes in KV
 - Creator profiles cached for 1 hour
 - Category data cached for 24 hours
 - Sales analytics cached for 10 minutes
 
 ### Database Optimization
+
 - D1 indexes on frequently queried fields
 - Template metadata stored in KV for faster access
 - Durable Objects for real-time sales tracking
 - Batch operations for compliance processing
 
 ### CDN Integration
+
 - Template previews served via Cloudflare CDN
 - Static assets (images, PDFs) cached at edge
 - API responses cached based on content type
@@ -914,6 +946,7 @@ const errorHandler = async (c, next) => {
 ## Environment Variables
 
 Required secrets (set with Wrangler):
+
 ```bash
 wrangler secret put JWT_SECRET
 wrangler secret put STRIPE_SECRET_KEY
@@ -924,6 +957,7 @@ wrangler secret put ENCRYPTION_KEY
 ```
 
 KV Namespaces:
+
 ```bash
 # Add to wrangler.toml
 [[kv_namespaces]]
@@ -940,6 +974,7 @@ id = "your-compliance-namespace-id"
 ```
 
 Durable Objects:
+
 ```bash
 # Add to wrangler.toml
 [[r2_buckets]]
@@ -953,12 +988,14 @@ class_name = "TemplateSales"
 
 ## Deployment
 
-### Deploy to production:
+### Deploy to production
+
 ```bash
 npm run deploy
 ```
 
-### Deploy specific environments:
+### Deploy specific environments
+
 ```bash
 # Staging
 npm run deploy:staging
@@ -967,12 +1004,14 @@ npm run deploy:staging
 npm run deploy:prod
 ```
 
-### View live logs:
+### View live logs
+
 ```bash
 npm run tail
 ```
 
-### Database migrations:
+### Database migrations
+
 ```bash
 # Run migrations
 npm run d1:migrate
@@ -983,12 +1022,14 @@ npm run d1:rollback
 
 ## Testing
 
-### Run all tests:
+### Run all tests
+
 ```bash
 npm test
 ```
 
-### Run specific test suites:
+### Run specific test suites
+
 ```bash
 # Marketplace tests
 npm run test:marketplace
@@ -1003,7 +1044,8 @@ npm run test:compliance
 npm run test:integration
 ```
 
-### Code quality checks:
+### Code quality checks
+
 ```bash
 # Type checking
 npm run type-check
@@ -1018,6 +1060,7 @@ npm run audit
 ## Monitoring & Analytics
 
 ### Key Metrics to Monitor
+
 - Template marketplace conversion rate
 - Creator acquisition and retention
 - Commission payout accuracy
@@ -1026,6 +1069,7 @@ npm run audit
 - Error rates by service
 
 ### Health Checks
+
 - KV namespace availability
 - D1 database connection
 - Stripe Connect status
@@ -1033,7 +1077,9 @@ npm run audit
 - Compliance engine status
 
 ### Alerting
+
 Set up alerts for:
+
 - API error rate > 5% over 5 minutes
 - Response time > 2s for 95th percentile
 - Durable Object failures
